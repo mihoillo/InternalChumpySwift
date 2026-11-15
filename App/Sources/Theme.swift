@@ -14,10 +14,12 @@ enum Chumpy {
 
 extension View {
 
-    /// Glass background: `.glassEffect()` on iOS 26, `.regularMaterial`
-    /// below.
+    /// Glass background: Liquid Glass on iOS 26, `.regularMaterial` below.
+    /// The `#if compiler` gate keeps the code compiling on pre-Xcode-26
+    /// toolchains, where the symbol does not exist yet.
     @ViewBuilder
     func chumpyGlassCard(cornerRadius: CGFloat = 20) -> some View {
+        #if compiler(>=6.2)
         if #available(iOS 26.0, *) {
             glassEffect(
                 in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
@@ -28,31 +30,49 @@ extension View {
                 in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
             )
         }
+        #else
+        background(
+            .regularMaterial,
+            in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+        )
+        #endif
     }
 
-    /// Glass capsule (floating pill bar, chips): `.glassEffect()` on
-    /// iOS 26, `.ultraThinMaterial` below.
+    /// Glass capsule (floating pill bar, chips): Liquid Glass on iOS 26,
+    /// `.ultraThinMaterial` below.
     @ViewBuilder
     func chumpyGlassCapsule() -> some View {
+        #if compiler(>=6.2)
         if #available(iOS 26.0, *) {
             glassEffect(in: Capsule())
         } else {
             background(.ultraThinMaterial, in: Capsule())
         }
+        #else
+        background(.ultraThinMaterial, in: Capsule())
+        #endif
     }
 
     /// The pill's own edge treatment: Liquid Glass carries its own, the
     /// material capsule needs the hairline stroke and the shadow.
     @ViewBuilder
     func chumpyPillEdge() -> some View {
+        #if compiler(>=6.2)
         if #available(iOS 26.0, *) {
             self
         } else {
-            overlay(
-                Capsule().strokeBorder(Color.primary.opacity(0.06), lineWidth: 0.5)
-            )
-            .shadow(color: .black.opacity(0.16), radius: 16, y: 8)
+            edgeStrokeAndShadow
         }
+        #else
+        edgeStrokeAndShadow
+        #endif
+    }
+
+    private var edgeStrokeAndShadow: some View {
+        overlay(
+            Capsule().strokeBorder(Color.primary.opacity(0.06), lineWidth: 0.5)
+        )
+        .shadow(color: .black.opacity(0.16), radius: 16, y: 8)
     }
 }
 
