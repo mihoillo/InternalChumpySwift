@@ -1,9 +1,11 @@
 import SwiftUI
 import ChumpyCore
 
-/// Servers tab: the subscription card, the group's server list and the
-/// add/refresh/delete actions. Ported from the Android client's
-/// `ServersScreen`, in the native iOS idiom.
+/// Servers tab, ported from the Android client's `ServersScreen` layout:
+/// the subscription card with the database tile, the centered chips header
+/// (total / expired / concealed / sort), and the grouped rows wearing the
+/// outer 28dp corners at the group's own edges and the small 4dp ones
+/// inside.
 struct ServersView: View {
     @EnvironmentObject private var appState: AppState
     @StateObject private var model = ServersViewModel()
@@ -22,7 +24,6 @@ struct ServersView: View {
             .navigationTitle("tab.servers")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) { subscriptionMenu }
                 ToolbarItem(placement: .navigationBarTrailing) { addMenu }
             }
         }
@@ -43,62 +44,121 @@ struct ServersView: View {
     // MARK: - List
 
     private var list: some View {
-        List {
-            if let sub = model.selectedSubscription {
-                Section {
+        ScrollView {
+            VStack(spacing: 12) {
+                if let error = model.error {
+                    ErrorCard(message: error)
+                }
+                if let sub = model.selectedSubscription {
                     SubscriptionCard(subscription: sub, model: model)
-                        .listRowBackground(Color.clear)
-                        .listRowInsets(EdgeInsets(top: 6, leading: 16, bottom: 6, trailing: 16))
+                        .contextMenu {
+                            subscriptionMenu
+                        }
                 }
+                header
+                rows
             }
+            .padding(.horizontal, 16)
+            .padding(.top, 8)
+            .padding(.bottom, 16)
+        }
+    }
 
-            Section {
-                ForEach(model.profiles) { profile in
-                    ServerRow(profile: profile, isSelected: isSelected(profile))
-                        .opacity(profile.concealed ? 0.45 : 1)
-                        .contentShape(Rectangle())
-                        .onTapGesture {
-                            // A concealed row stands where it always stood
-                            // but stays out of play: the menu's own
-                            // "reveal" is its way back.
-                            if !profile.concealed { select(profile) }
-                        }
-                        .contextMenu { rowMenu(profile) }
-                        .swipeActions(edge: .trailing, allowsFullSwipe: false) {
-                            if model.isStandaloneSelected {
-                                Button(role: .destructive) {
-                                    model.deleteManualProfile(profile.id)
-                                } label: {
-                                    Label("servers.delete", systemImage: "trash")
-                                }
-                            }
-                        }
-                }
-            } header: {
-                HStack {
-                    Text("servers.group.title")
-                    Spacer()
-                    if model.concealedCount > 0 {
-                        Button {
-                            model.setRevealConcealed(!model.includeConcealed)
-                        } label: {
-                            Label(
-                                "\(model.concealedCount)",
-                                systemImage: model.includeConcealed ? "eye" : "eye.slash"
-                            )
-                            .font(.caption)
-                        }
-                        .buttonStyle(.borderless)
+    // MARK: - Header chips
+
+    /// The centered chips row: the total (a tap runs the ping sweep), the
+    /// expired badge, the concealed count (the reveal mode's door), the
+    /// standing sort mode with its small menu of the four.
+    private var header: some View {
+        FlowStack(alignment: .center, spacing: 4) {
+            if !model.profiles.isEmpty {
+                InfoChip(
+                    value: String(
+                        format: NSLocalizedString("servers.total", bundle: .main, comment: ""),
+                        model.profiles.count
+                    ),
+                    icon: "square.stack.3d.up",
+                    animateValue: true,
+                    action: {
+                        Task { await model.pingServers() }
                     }
+                )
+                .overlay {
                     if model.isPinging {
                         ProgressView()
+                            .scaleEffect(0.7)
                     }
+                }
+            }
+            if isSubscriptionExpired {
+                InfoChip(
+                    value: String(localized: "subscription.expired.chip", bundle: .main),
+                    container: Chumpy.errorContainer,
+                    content: Color.red
+                )
+            }
+            if model.concealedCount > 0 {
+                InfoChip(
+                    value: "\(model.concealedCount)",
+                    icon: model.includeConcealed ? "eye" : "eye.slash",
+                    animateValue: true,
+                    action: {
+                        model.setRevealConcealed(!model.includeConcealed)
+                    }
+                )
+            }
+            if !model.profiles.isEmpty {
+                Menu {
+                    ForEach(ServersSort.allCases) { mode in
+                        sortMenuButton(mode)
+                    }
+                } label: {
+                    InfoChip(
+                        value: NSLocalizedString(
+                            model.sort.localizationKey, bundle: .main, comment: ""
+                        ),
+                        icon: "arrow.up.arrow.down"
+                    )
                 }
             }
         }
-        .listStyle(.insetGrouped)
-        .refreshable {
-            await model.pingServers()
+        .frame(maxWidth: .infinity)
+    }
+
+    private func sortMenuButton(_ mode: ServersSort) -> some View {
+        Button {
+            model.setSort(mode)
+        } label: {
+            if mode == model.sort {
+                Label(
+                    NSLocalizedString(mode.localizationKey, bundle: .main, comment: ""),
+                    systemImage: "checkmark"
+                )
+            } else {
+                Text(NSLocalizedString(mode.localizationKey, bundle: .main, comment: ""))
+            }
+        }
+    }
+
+    // MARK: - Rows
+
+    private var rows: some View {
+        let total = model.profiles.count
+        return VStack(spacing: 2) {
+            ForEach(Array(model.profiles.enumerated()), id: \.element.id) { index, profile in
+                ServerGroupRow(
+                    profile: profile,
+                    isFirst: index == 0,
+                    isLast: index == total - 1,
+                    isSelected: isSelected(profile),
+                    tunnelUp: appState.status == .connected || appState.status == .reasserting,
+                    onSelect: { select(profile) },
+                    onDelete: { model.deleteManualProfile(profile.id) },
+                    onTogglePinned: { model.togglePinned(profile) },
+                    onToggleConcealed: { model.setConcealed(profile, concealed: !profile.concealed) },
+                    onTest: { Task { await model.pingOne(profile) } }
+                )
+            }
         }
     }
 
@@ -115,37 +175,82 @@ struct ServersView: View {
         }
     }
 
-    /// The row's own menu: the pin, the hide, the test. Ported from the
-    /// Android client's `RowMenu` — the delete keeps its swipe, the copy
-    /// waits for v2 (no link sharing without a share sheet yet).
+    private var isSubscriptionExpired: Bool {
+        guard let sub = model.selectedSubscription, sub.expireEpochSeconds > 0 else {
+            return false
+        }
+        return Double(sub.expireEpochSeconds) < Date().timeIntervalSince1970
+    }
+
+    // MARK: - Subscription menu
+
+    /// The card's own tap asks which group to show — the chooser's ask on
+    /// iOS is the context menu, carrying the group list, the auto-update
+    /// toggle and the group's own delete.
     @ViewBuilder
-    private func rowMenu(_ profile: Profile) -> some View {
+    private var subscriptionMenu: some View {
+        if model.manualProfileCount > 0 {
+            subscriptionPickerRow(
+                id: standaloneSubscriptionID,
+                name: String(localized: "servers.standalone", bundle: .main)
+            )
+        }
+        ForEach(model.subscriptions) { sub in
+            subscriptionPickerRow(
+                id: sub.id,
+                name: sub.name.isEmpty ? sub.url : sub.name
+            )
+        }
+        Divider()
+        autoUpdateToggle
+        Divider()
         Button {
-            model.togglePinned(profile)
+            showAddSubscription = true
         } label: {
-            if profile.pinned {
-                Label("servers.row.unpin", systemImage: "pin.slash")
+            Label("servers.add.subscription", systemImage: "link.badge.plus")
+        }
+        Button {
+            showPasteLinks = true
+        } label: {
+            Label("servers.add.paste", systemImage: "doc.on.clipboard")
+        }
+        Divider()
+        Button(role: .destructive) {
+            if let id = model.selectedSubscriptionID {
+                model.deleteSubscription(id)
+            }
+        } label: {
+            Label("servers.deleteSubscription", systemImage: "trash")
+        }
+    }
+
+    /// The per-subscription auto-update switch, inside the card's own menu —
+    /// the Android client's own arrangement.
+    @ViewBuilder
+    private var autoUpdateToggle: some View {
+        if let id = model.selectedSubscriptionID, !model.isStandaloneSelected,
+           let sub = model.subscriptions.first(where: { $0.id == id }) {
+            Button {
+                model.setSubscriptionAutoUpdate(id: id, enabled: !sub.autoUpdate)
+            } label: {
+                if sub.autoUpdate {
+                    Label("servers.autoUpdate", systemImage: "checkmark")
+                } else {
+                    Text("servers.autoUpdate")
+                }
+            }
+        }
+    }
+
+    private func subscriptionPickerRow(id: String, name: String) -> some View {
+        Button {
+            model.selectSubscription(id)
+        } label: {
+            if model.selectedSubscriptionID == id {
+                Label(name, systemImage: "checkmark")
             } else {
-                Label("servers.row.pin", systemImage: "pin")
+                Text(name)
             }
-        }
-        if profile.concealed {
-            Button {
-                model.setConcealed(profile, concealed: false)
-            } label: {
-                Label("servers.row.reveal", systemImage: "eye")
-            }
-        } else {
-            Button {
-                model.setConcealed(profile, concealed: true)
-            } label: {
-                Label("servers.row.hide", systemImage: "eye.slash")
-            }
-        }
-        Button {
-            Task { await model.pingOne(profile) }
-        } label: {
-            Label("servers.row.test", systemImage: "bolt.horizontal")
         }
     }
 
@@ -168,69 +273,19 @@ struct ServersView: View {
                 showAddSubscription = true
             } label: {
                 Label("servers.add.subscription", systemImage: "plus")
+                    .font(.system(size: 14, weight: .semibold))
+                    .padding(.horizontal, 20)
+                    .padding(.vertical, 12)
+                    .background(Capsule().fill(Chumpy.secondaryContainer))
+                    .foregroundStyle(Color.accentColor)
             }
-            .buttonStyle(.borderedProminent)
+            .buttonStyle(.plain)
             Spacer()
         }
         .frame(maxWidth: .infinity)
     }
 
     // MARK: - Toolbar
-
-    private var subscriptionMenu: some View {
-        Menu {
-            if model.manualProfileCount > 0 {
-                subscriptionPickerRow(
-                    id: standaloneSubscriptionID,
-                    name: String(localized: "servers.standalone", bundle: .main)
-                )
-            }
-            ForEach(model.subscriptions) { sub in
-                subscriptionPickerRow(
-                    id: sub.id,
-                    name: sub.name.isEmpty ? sub.url : sub.name
-                )
-            }
-            autoUpdateToggle
-        } label: {
-            Image(systemName: "rectangle.stack")
-        }
-    }
-
-    /// The per-subscription auto-update switch, inside the dropdown — the
-    /// Android client's own arrangement.
-    @ViewBuilder
-    private var autoUpdateToggle: some View {
-        if let id = model.selectedSubscriptionID, !model.isStandaloneSelected,
-           let sub = model.subscriptions.first(where: { $0.id == id }) {
-            Divider()
-            Button {
-                model.setSubscriptionAutoUpdate(id: id, enabled: !sub.autoUpdate)
-            } label: {
-                if sub.autoUpdate {
-                    Label {
-                        Text("servers.autoUpdate")
-                    } icon: {
-                        Image(systemName: "checkmark")
-                    }
-                } else {
-                    Text("servers.autoUpdate")
-                }
-            }
-        }
-    }
-
-    private func subscriptionPickerRow(id: String, name: String) -> some View {
-        Button {
-            model.selectSubscription(id)
-        } label: {
-            if model.selectedSubscriptionID == id {
-                Label(name, systemImage: "checkmark")
-            } else {
-                Text(name)
-            }
-        }
-    }
 
     private var addMenu: some View {
         Menu {
@@ -252,74 +307,124 @@ struct ServersView: View {
 
 // MARK: - Subscription card
 
+/// The subscription card: the database tile on its square backing over the
+/// report — the name, the usage bar, the consumed line, the days left, the
+/// update stamp — with the reload button at its side. Ported from the
+/// Android client's `SubscriptionCard` report face.
 private struct SubscriptionCard: View {
     let subscription: SubscriptionEntity
     @ObservedObject var model: ServersViewModel
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(alignment: .firstTextBaseline) {
-                Text(subscription.name.isEmpty ? subscription.url : subscription.name)
-                    .font(.headline)
+        HStack(alignment: .top, spacing: 16) {
+            ZStack {
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .fill(Chumpy.secondaryContainer)
+                    .frame(width: 40, height: 40)
+                Image(systemName: "externaldrive.fill")
+                    .font(.system(size: 17, weight: .medium))
+                    .foregroundStyle(Color.accentColor)
+            }
+
+            VStack(alignment: .leading, spacing: 5) {
+                Text(name)
+                    .font(.system(size: 16, weight: .semibold))
                     .lineLimit(1)
                     .truncationMode(.middle)
-                Spacer()
-                if !model.isStandaloneSelected {
-                    if model.updatingSubscriptionID == subscription.id {
-                        ProgressView()
-                    } else {
-                        Button {
-                            Task { await model.updateSubscription(subscription.id) }
-                        } label: {
-                            Image(systemName: "arrow.clockwise")
-                        }
-                        .buttonStyle(.borderless)
-                    }
+                    .foregroundStyle(.primary)
+
+                if subscription.lastError != nil {
+                    Text(subscription.lastError ?? "")
+                        .font(.footnote)
+                        .foregroundStyle(Color.red)
+                        .lineLimit(2)
+                }
+
+                if subscription.totalBytes > 0 {
+                    usage
+                    consumedLine
+                }
+                if let daysText = expiryText {
+                    Text(daysText)
+                        .font(.system(size: 12))
+                        .foregroundStyle(isExpired ? Color.red : Color.secondary)
+                }
+                if let updated = subscription.lastUpdateSuccess {
+                    Text(String(
+                        format: NSLocalizedString("servers.updatedAt", bundle: .main, comment: ""),
+                        updated.formatted(date: .abbreviated, time: .shortened)
+                    ))
+                    .font(.system(size: 12))
+                    .foregroundStyle(Color.secondary)
                 }
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
 
-            if subscription.lastError != nil {
-                Text(subscription.lastError ?? "")
-                    .font(.footnote)
-                    .foregroundStyle(.red)
-                    .lineLimit(2)
-            }
-
-            if subscription.totalBytes > 0 {
-                traffic
-            }
-
-            if let updated = subscription.lastUpdateSuccess {
-                Text(String(
-                    format: NSLocalizedString("servers.updated", bundle: .main, comment: ""),
-                    updated.formatted(date: .abbreviated, time: .shortened)
-                ))
-                .font(.caption)
-                .foregroundStyle(.secondary)
-            }
-
-            if subscription.expireEpochSeconds > 0 {
-                Text(expiryText)
-                    .font(.caption)
-                    .foregroundStyle(isExpired ? .red : .secondary)
-            }
+            updateButton
         }
         .padding(16)
-        .chumpyGlassCard()
+        .chumpyCard()
     }
 
-    private var traffic: some View {
-        let used = subscription.uploadBytes + subscription.downloadBytes
-        let ratio = subscription.totalBytes > 0
-            ? Double(used) / Double(subscription.totalBytes) : 0
-        return VStack(alignment: .leading, spacing: 4) {
-            ProgressView(value: min(max(ratio, 0), 1))
-                .tint(ratio > 0.9 ? .red : Chumpy.accent)
-            Text("\(ByteCountFormatter.string(fromByteCount: used, countStyle: .binary)) / "
-                + ByteCountFormatter.string(fromByteCount: subscription.totalBytes, countStyle: .binary))
-                .font(.caption)
-                .foregroundStyle(.secondary)
+    private var name: String {
+        subscription.name.isEmpty ? subscription.url : subscription.name
+    }
+
+    private var updateButton: some View {
+        Group {
+            if model.updatingSubscriptionID == subscription.id {
+                ZStack {
+                    Circle()
+                        .fill(Chumpy.surfaceContainerLow)
+                        .frame(width: 40, height: 40)
+                    ProgressView()
+                        .scaleEffect(0.8)
+                }
+            } else {
+                Button {
+                    Task { await model.updateSubscription(subscription.id) }
+                } label: {
+                    Image(systemName: "arrow.clockwise")
+                        .font(.system(size: 15, weight: .medium))
+                        .foregroundStyle(Color.accentColor)
+                        .frame(width: 40, height: 40)
+                        .background(Circle().fill(Chumpy.surfaceContainerLow))
+                }
+                .buttonStyle(.plain)
+                .disabled(model.isStandaloneSelected)
+                .opacity(model.isStandaloneSelected ? 0.4 : 1)
+            }
         }
+    }
+
+    /// The panel's usage bar: the consumed share of what the panel allows.
+    private var usage: some View {
+        GeometryReader { geo in
+            ZStack(alignment: .leading) {
+                Capsule()
+                    .fill(Color.primary.opacity(0.1))
+                Capsule()
+                    .fill(usedRatio > 0.9 ? Color.red : Chumpy.accent)
+                    .frame(width: max(geo.size.width * usedRatio, 4))
+            }
+        }
+        .frame(height: 4)
+    }
+
+    private var usedRatio: CGFloat {
+        guard subscription.totalBytes > 0 else { return 0 }
+        let used = subscription.uploadBytes + subscription.downloadBytes
+        return min(max(Double(used) / Double(subscription.totalBytes), 0), 1)
+    }
+
+    private var consumedLine: some View {
+        let used = subscription.uploadBytes + subscription.downloadBytes
+        return Text(
+            "\(ByteCountFormatter.string(fromByteCount: used, countStyle: .binary)) / "
+                + ByteCountFormatter.string(fromByteCount: subscription.totalBytes, countStyle: .binary)
+        )
+        .font(.system(size: 12))
+        .foregroundStyle(Color.secondary)
     }
 
     private var isExpired: Bool {
@@ -327,84 +432,229 @@ private struct SubscriptionCard: View {
             && Double(subscription.expireEpochSeconds) < Date().timeIntervalSince1970
     }
 
-    private var expiryText: String {
+    private var expiryText: String? {
+        guard subscription.expireEpochSeconds > 0 else { return nil }
         let secondsLeft = Double(subscription.expireEpochSeconds) - Date().timeIntervalSince1970
         if secondsLeft <= 0 {
             return String(localized: "servers.expired", bundle: .main)
         }
         let days = Int(secondsLeft / 86_400)
         return String(
-            format: NSLocalizedString("servers.expiresInDays", bundle: .main, comment: ""),
+            format: NSLocalizedString("servers.daysLeft", bundle: .main, comment: ""),
             days
         )
     }
 }
 
-// MARK: - Server row
+// MARK: - Server group row
 
-private struct ServerRow: View {
+/// One row of the grouped list: the 72pt-min body, the round 40pt tile
+/// (tonal, accent when picked) with the flag or the globe, the title with
+/// its "· N ms" tail (accent from 200 ms), the protocol/host supporting
+/// line — the whole row's paint lerps by selection. Ported from the
+/// Android client's `ServerGroupRow` / `ServerRow`.
+private struct ServerGroupRow: View {
     let profile: Profile
+    let isFirst: Bool
+    let isLast: Bool
     let isSelected: Bool
+    let tunnelUp: Bool
+    var onSelect: () -> Void
+    var onDelete: () -> Void
+    var onTogglePinned: () -> Void
+    var onToggleConcealed: () -> Void
+    var onTest: () -> Void
 
     var body: some View {
-        HStack(spacing: 12) {
-            Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
-                .foregroundStyle(isSelected ? Chumpy.accent : Color.secondary.opacity(0.5))
+        ZStack(alignment: .topTrailing) {
+            rowFill
+                .overlay(rowContent)
+                .contextMenu { menu }
+            if profile.pinned {
+                // The pin at the row's top-right corner, rotated the way the
+                // Android client wears it — over the group's edge.
+                Image(systemName: "pin.fill")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(Color.accentColor)
+                    .rotationEffect(.degrees(30))
+                    .offset(x: 14, y: -11)
+                    .padding(.trailing, 10)
+            }
+        }
+        .opacity(profile.concealed ? 0.45 : 1)
+        .animation(.easeInOut(duration: 0.18), value: isSelected)
+    }
+
+    private var rowFill: some View {
+        UnevenCornerShape(
+            topLeft: isFirst ? Chumpy.cardRadius : Chumpy.innerRadius,
+            topRight: isFirst ? Chumpy.cardRadius : Chumpy.innerRadius,
+            bottomLeft: isLast ? Chumpy.cardRadius : Chumpy.innerRadius,
+            bottomRight: isLast ? Chumpy.cardRadius : Chumpy.innerRadius
+        )
+        .fill(isSelected ? Chumpy.primaryContainer : Color.primary.opacity(0.055))
+        .animation(.easeInOut(duration: 0.18), value: isSelected)
+    }
+
+    private var rowContent: some View {
+        HStack(spacing: 16) {
+            tile
+
             VStack(alignment: .leading, spacing: 2) {
-                Text(profile.remarks.isEmpty ? profile.server : profile.remarks)
-                    .font(.body.weight(.medium))
-                    .lineLimit(1)
-                    .truncationMode(.middle)
-                HStack(spacing: 4) {
-                    Text(profile.endpoint)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                HStack(alignment: .firstTextBaseline, spacing: 0) {
+                    Text(title)
+                        .font(.system(size: 16, weight: .medium))
                         .lineLimit(1)
                         .truncationMode(.middle)
-                    Text(protocolLabel)
-                        .font(.caption2.weight(.semibold))
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 1)
-                        .background(Capsule().fill(Color.primary.opacity(0.08)))
+                    if let pingText {
+                        Text("  ·  \(pingText)")
+                            .font(.system(size: 13))
+                            .lineLimit(1)
+                            .foregroundStyle(pingColor)
+                    }
                 }
+                Text(subtitle)
+                    .font(.system(size: 13))
+                    .foregroundStyle(Color.secondary)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
             }
-            Spacer()
-            if profile.pinned {
-                Image(systemName: "pin.fill")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-            if let delay = profile.testDelayMillis, delay > 0 {
-                Text("\(delay) ms")
-                    .font(.caption.monospacedDigit())
-                    .foregroundStyle(delayColor(delay))
+
+            Spacer(minLength: 0)
+
+            if profile.concealed {
+                Image(systemName: "eye.slash")
+                    .font(.system(size: 14))
+                    .foregroundStyle(Color.secondary)
             }
         }
-        .padding(.vertical, 2)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 8)
+        .frame(minHeight: 72)
+        .contentShape(Rectangle())
+        .onTapGesture {
+            // A concealed row stands where it always stood but stays out
+            // of play: the menu's own "reveal" is its way back.
+            if !profile.concealed { onSelect() }
+        }
     }
 
-    private var protocolLabel: String {
+    /// The round 40pt tile: tonal, the accent's own fill when picked — the
+    /// flag rides the slot, names without one keep the globe, balancers
+    /// keep the explore compass.
+    private var tile: some View {
+        ZStack {
+            Circle()
+                .fill(isSelected ? Chumpy.accent : Chumpy.secondaryContainer)
+                .frame(width: 40, height: 40)
+            if let flag = leadingFlagEmoji {
+                Text(flag)
+                    .font(.system(size: 20))
+            } else if profile.type == .balancer {
+                Image(systemName: "safari")
+                    .font(.system(size: 17, weight: .medium))
+                    .foregroundStyle(isSelected ? Color.white : Color.accentColor)
+            } else {
+                Image(systemName: "globe")
+                    .font(.system(size: 17, weight: .regular))
+                    .foregroundStyle(isSelected ? Color.white : Color.accentColor)
+            }
+        }
+    }
+
+    private var title: String {
+        let raw = profile.remarks.isEmpty ? profile.server : profile.remarks
+        // The flag the panel put at the front of the name rides the tile
+        // instead; the title keeps the rest.
+        if let flag = leadingFlagEmoji, raw.hasPrefix(flag) {
+            return String(raw.dropFirst(flag.count)).trimmingCharacters(in: .whitespaces)
+        }
+        return raw
+    }
+
+    private var leadingFlagEmoji: String? {
+        let scalars = Array((profile.remarks.isEmpty ? profile.server : profile.remarks)
+            .unicodeScalars.prefix(2))
+        guard scalars.count == 2,
+              (0x1F1E6...0x1F1FF).contains(scalars[0].value),
+              (0x1F1E6...0x1F1FF).contains(scalars[1].value)
+        else { return nil }
+        return String(scalars)
+    }
+
+    /// "· N ms" or the offline tail — only once the row has ever answered a
+    /// test; never-measured rows stay quiet.
+    private var pingText: String? {
+        guard profile.type != .balancer,
+              profile.testDelayMillis != nil || profile.lastTestAt != nil
+        else { return nil }
+        guard let delay = profile.testDelayMillis, delay >= 0 else {
+            return NSLocalizedString("servers.offline", bundle: .main, comment: "")
+        }
+        return String(
+            format: NSLocalizedString("servers.pingMs", bundle: .main, comment: ""),
+            Int(delay)
+        )
+    }
+
+    /// 200 ms is where the server starts feeling far away: from there the
+    /// tail takes the accent tone, matching the home ping chip's law.
+    private var pingColor: Color {
+        if let delay = profile.testDelayMillis, delay >= 200 {
+            return Color.accentColor
+        }
+        return .secondary
+    }
+
+    private var subtitle: String {
+        let host = "\(profile.server):\(profile.serverPort)"
+        let proto: String?
         switch profile.type {
-        case .balancer:
-            return strategyLabel
-        default:
-            return profile.type.rawValue
+        case .balancer: proto = nil
+        default: proto = profile.type.rawValue.lowercased()
         }
+        return [proto, host].compactMap { $0 }.joined(separator: "  ·  ")
     }
 
-    private var strategyLabel: String {
-        switch profile.balancerStrategy {
-        case "leastping": return "PING"
-        case "leastload": return "LOAD"
-        case "roundrobin": return "RR"
-        default: return "AUTO"
+    /// The row's own asks: the pin, the hide, the test — the delete stands
+    /// only for the loose configs that own themselves, the copy hands the
+    /// link out.
+    @ViewBuilder
+    private var menu: some View {
+        Button {
+            onTogglePinned()
+        } label: {
+            if profile.pinned {
+                Label("servers.row.unpin", systemImage: "pin.slash")
+            } else {
+                Label("servers.row.pin", systemImage: "pin")
+            }
         }
-    }
-
-    private func delayColor(_ delay: Int64) -> Color {
-        if delay < 200 { return .green }
-        if delay < 500 { return .orange }
-        return .red
+        if profile.concealed {
+            Button {
+                onToggleConcealed()
+            } label: {
+                Label("servers.row.reveal", systemImage: "eye")
+            }
+        } else {
+            Button {
+                onToggleConcealed()
+            } label: {
+                Label("servers.row.hide", systemImage: "eye.slash")
+            }
+        }
+        Button {
+            onTest()
+        } label: {
+            Label("servers.row.test", systemImage: "bolt.horizontal")
+        }
+        if profile.subscriptionID == nil {
+            Button(role: .destructive) {
+                onDelete()
+            } label: {
+                Label("servers.delete", systemImage: "trash")
+            }
+        }
     }
 }
 
@@ -480,7 +730,7 @@ private struct PasteLinksSheet: View {
                     .font(.body.monospaced())
                     .frame(maxHeight: .infinity)
                     .padding(8)
-                    .chumpyGlassCard(cornerRadius: 12)
+                    .chumpyCard(radius: 12)
                     .padding(.horizontal)
                 if let error {
                     Text(error)
@@ -495,9 +745,13 @@ private struct PasteLinksSheet: View {
                     }
                 } label: {
                     Text("servers.add.import")
+                        .font(.system(size: 14, weight: .semibold))
                         .frame(maxWidth: .infinity)
+                        .padding(.vertical, 14)
+                        .background(Capsule().fill(Chumpy.secondaryContainer))
+                        .foregroundStyle(Color.accentColor)
                 }
-                .buttonStyle(.borderedProminent)
+                .buttonStyle(.plain)
                 .disabled(text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                 .padding(.horizontal)
                 .padding(.bottom, 8)

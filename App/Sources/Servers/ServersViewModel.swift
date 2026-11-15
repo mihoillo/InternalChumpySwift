@@ -20,6 +20,8 @@ final class ServersViewModel: ObservableObject {
     @Published private(set) var manualProfileCount = 0
     /// How many rows stand concealed behind the group's reveal chip.
     @Published private(set) var concealedCount = 0
+    /// The list's own standing order; the header's chip picks it.
+    @Published private(set) var sort: ServersSort = .default
     @Published var error: String?
 
     /// Whether the concealed rows stand in the list — the reveal mode's
@@ -86,17 +88,22 @@ final class ServersViewModel: ObservableObject {
         let groupRows = store.profiles(ofSubscription: groupID)
         concealedCount = groupRows
             .filter { !$0.hidden && $0.concealed }.count
-        // The pinned rows keep the top whatever the order says; the rest
-        // follow the subscription's own order. Ported from the Android
-        // client's `ServersSort.DEFAULT`.
+        // The pinned rows keep the top whatever the order says; the mode's
+        // own key orders what stands above the pins' floor. Ported from the
+        // Android client's `ServersSort.comparator()`.
+        sort = settings.serversSort
         profiles = groupRows
             .filter { !$0.hidden && (includeConcealed || !$0.concealed) }
-            .sorted { lhs, rhs in
-                if lhs.pinned != rhs.pinned { return lhs.pinned }
-                if lhs.order != rhs.order { return lhs.order < rhs.order }
-                return lhs.remarks < rhs.remarks
-            }
+            .sorted { sort.isOrdered($0, before: $1) }
         error = nil
+    }
+
+    /// The header's sort chip pick: the standing mode trades for the chosen
+    /// one and the change rides the persisted settings.
+    func setSort(_ mode: ServersSort) {
+        guard mode != sort else { return }
+        ConnectionStore.update { $0.serversSort = mode }
+        reload()
     }
 
     // MARK: - Selection

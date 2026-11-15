@@ -1,9 +1,9 @@
 import SwiftUI
 import ChumpyCore
 
-/// Stats tab: live tunnel log (core log ring buffer), the session's traffic
-/// and the week's daily buckets as a bar chart. The 15-minute rate graph
-/// comes later.
+/// Stats tab, ported from the Android client's `StatsScreen` layout: the
+/// week daily bars card first, the session's own traffic total, and the core
+/// log — each a 28dp tonal card with an icon'd header line.
 struct StatsView: View {
     @State private var lines: [String] = ChumpyLog.shared.all
     @State private var traffic: String = "0 bytes"
@@ -13,26 +13,23 @@ struct StatsView: View {
 
     var body: some View {
         NavHost {
-            List {
-                Section("stats.overview") {
-                    LabeledRow(label: "stats.trafficTotal", value: traffic)
-                }
-                Section("stats.week") {
+            ScrollView {
+                VStack(spacing: 12) {
                     WeekTrafficCard(week: week)
-                        .listRowInsets(EdgeInsets(top: 12, leading: 16, bottom: 12, trailing: 16))
+
+                    ChartHeader(icon: "arrow.down.circle", title: "stats.trafficTotal")
+                        .padding(.horizontal, 4)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    totalTrafficCard
+
+                    ChartHeader(icon: "doc.text", title: "stats.coreLog")
+                        .padding(.horizontal, 4)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    coreLogCard
                 }
-                Section("stats.coreLog") {
-                    if lines.isEmpty {
-                        Text("stats.empty")
-                            .foregroundStyle(.secondary)
-                    } else {
-                        ForEach(Array(lines.enumerated().reversed()), id: \.offset) { _, line in
-                            Text(line)
-                                .font(.system(size: 11, design: .monospaced))
-                                .textSelection(.enabled)
-                        }
-                    }
-                }
+                .padding(.horizontal, 16)
+                .padding(.top, 8)
+                .padding(.bottom, 16)
             }
             .navigationTitle("tab.stats")
             .navigationBarTitleDisplayMode(.inline)
@@ -50,13 +47,67 @@ struct StatsView: View {
         traffic = ByteCountFormatter.string(fromByteCount: Int64(bytes), countStyle: .binary)
         week = DailyTrafficStore().readWeek()
     }
+
+    // MARK: - Cards
+
+    private var totalTrafficCard: some View {
+        Text(traffic)
+            .font(.system(size: 28, weight: .semibold))
+            .monospacedDigit()
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(16)
+            .chumpyCard()
+    }
+
+    private var coreLogCard: some View {
+        Group {
+            if lines.isEmpty {
+                Text("stats.empty")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            } else {
+                VStack(alignment: .leading, spacing: 2) {
+                    ForEach(Array(lines.enumerated().reversed()), id: \.offset) { _, line in
+                        Text(line)
+                            .font(.system(size: 11, design: .monospaced))
+                            .textSelection(.enabled)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                }
+            }
+        }
+        .padding(16)
+        .chumpyCard()
+    }
 }
 
-// MARK: - Week chart
+// MARK: - Chart header
+
+/// The chart card's own header: the icon and the title on one line, the way
+/// the Android client's `ChartHeader` wears it.
+struct ChartHeader: View {
+    let icon: String
+    let title: LocalizedStringKey
+
+    var body: some View {
+        HStack(spacing: 6) {
+            Image(systemName: icon)
+                .font(.system(size: 14, weight: .medium))
+                .foregroundStyle(Color.accentColor)
+            Text(title)
+                .font(.system(size: 14, weight: .medium))
+                .foregroundStyle(.primary)
+        }
+    }
+}
+
+// MARK: - Week chart card
 
 /// The last seven days' traffic as stacked bars — received over sent, both
-/// directions of every session folded into the day's bucket. iOS 15 has no
-/// Charts framework; rectangles are the whole chart.
+/// directions of every session folded into the day's bucket, on the
+/// card with its own header. iOS 15 has no Charts framework; rectangles are
+/// the whole chart.
 private struct WeekTrafficCard: View {
 
     let week: [DailyTraffic]
@@ -66,23 +117,28 @@ private struct WeekTrafficCard: View {
     private let barWidth: CGFloat = 18
 
     var body: some View {
-        if week.isEmpty {
-            Text("stats.week.empty")
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-        } else {
-            VStack(alignment: .leading, spacing: 10) {
-                HStack(alignment: .bottom, spacing: 12) {
-                    ForEach(days, id: \.epochDay) { day in
-                        bar(day)
-                    }
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                Text(totalText)
-                    .font(.caption)
+        VStack(alignment: .leading, spacing: 12) {
+            ChartHeader(icon: "calendar", title: "stats.week")
+            if week.isEmpty {
+                Text("stats.week.empty")
+                    .font(.subheadline)
                     .foregroundStyle(.secondary)
+            } else {
+                VStack(alignment: .leading, spacing: 10) {
+                    HStack(alignment: .bottom, spacing: 12) {
+                        ForEach(days, id: \.epochDay) { day in
+                            bar(day)
+                        }
+                    }
+                    .frame(maxWidth: .infinity, alignment: .center)
+                    Text(totalText)
+                        .font(.system(size: 12))
+                        .foregroundStyle(.secondary)
+                }
             }
         }
+        .padding(16)
+        .chumpyCard()
     }
 
     /// The week with its missing days filled as zero buckets, oldest first —
@@ -132,7 +188,7 @@ private struct WeekTrafficCard: View {
             .frame(width: barWidth, height: barHeight, alignment: .bottom)
             .opacity(idle ? 0.25 : 1)
             Text(dayLabel(day))
-                .font(.caption2)
+                .font(.system(size: 11))
                 .foregroundStyle(.secondary)
         }
     }
@@ -150,22 +206,5 @@ private struct WeekTrafficCard: View {
         let todayOrdinal = calendar.ordinality(of: .day, in: .era, for: Date()) ?? 0
         let offset = todayOrdinal - Int(day.epochDay)
         return calendar.date(byAdding: .day, value: -offset, to: Date()) ?? Date()
-    }
-}
-
-// MARK: - Shared row
-
-private struct LabeledRow: View {
-    let label: LocalizedStringKey
-    let value: String
-
-    var body: some View {
-        HStack {
-            Text(label)
-            Spacer()
-            Text(value)
-                .foregroundStyle(.secondary)
-                .monospacedDigit()
-        }
     }
 }

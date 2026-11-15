@@ -71,3 +71,26 @@
 "routing.br" = "Обход Бразилии";
 
 "error.noProfile" = "Сервер не выбран. Добавьте подписку или вставьте ссылку во вкладке Серверы.";
+
+"greeting.morning" = "Доброе утро";
+"greeting.afternoon" = "Добрый день";
+"greeting.evening" = "Добрый вечер";
+"greeting.night" = "Доброй ночи";
+
+"home.state.up" = "Подключено";
+"home.state.down" = "Не подключено";
+"home.state.connecting" = "Подключение…";
+"home.state.disconnecting" = "Отключение…";
+
+"subscription.expired.chip" = "Истекла";
+
+"servers.total" = "Серверов: %d";
+"servers.offline" = "нет пинга";
+"servers.pingMs" = "%d мс";
+"servers.sort.default" = "по Конфигу";
+"servers.sort.name" = "по Имени";
+"servers.sort.ping" = "по Пингу";
+"servers.sort.lastUsed" = "по Использованию";
+"servers.updatedAt" = "Обновлена в %@";
+"servers.daysLeft" = "Осталось %d дн.";
+"servers.deleteSubscription" = "Удалить подписку";

@@ -71,3 +71,26 @@
 "routing.br" = "Bypass Brazil";
 
 "error.noProfile" = "No server selected. Add a subscription or paste a link in Servers.";
+
+"greeting.morning" = "Good morning";
+"greeting.afternoon" = "Good afternoon";
+"greeting.evening" = "Good evening";
+"greeting.night" = "Good night";
+
+"home.state.up" = "Connected";
+"home.state.down" = "Not connected";
+"home.state.connecting" = "Connecting…";
+"home.state.disconnecting" = "Disconnecting…";
+
+"subscription.expired.chip" = "Expired";
+
+"servers.total" = "Servers: %d";
+"servers.offline" = "can't ping";
+"servers.pingMs" = "%d ms";
+"servers.sort.default" = "by Config";
+"servers.sort.name" = "by Name";
+"servers.sort.ping" = "by Ping";
+"servers.sort.lastUsed" = "by Last use";
+"servers.updatedAt" = "Updated at %@";
+"servers.daysLeft" = "%d days left";
+"servers.deleteSubscription" = "Delete subscription";

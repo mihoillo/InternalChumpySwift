@@ -56,4 +56,20 @@ final class ConnectionStoreTests: XCTestCase {
         ConnectionStore.update(defaults: defaults) { $0.selectedProfileID = "p-9" }
         XCTAssertEqual("p-9", ConnectionStore.current(defaults: defaults).selectedProfileID)
     }
+
+    func testSortRoundTripsAndOldSnapshotsDecode() {
+        var settings = ConnectionSettings()
+        settings.serversSort = .lastUsed
+        ConnectionStore.update(settings, defaults: defaults)
+        XCTAssertEqual(ServersSort.lastUsed, ConnectionStore.current(defaults: defaults).serversSort)
+
+        // A snapshot written before the sort existed carries no key: the
+        // default order stands.
+        let legacy = """
+        {"selectedSubscriptionID":"s","selectedProfileID":null,
+         "routingMode":"global","testURL":"https://example.com"}
+        """
+        defaults.set(Data(legacy.utf8), forKey: "chumpy.connection.settings")
+        XCTAssertEqual(ServersSort.default, ConnectionStore.current(defaults: defaults).serversSort)
+    }
 }

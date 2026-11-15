@@ -14,17 +14,21 @@ public struct ConnectionSettings: Equatable {
     public var routingMode: RoutingMode
     /// The URL real delay measurements fetch through the tested outbound.
     public var testURL: String
+    /// The servers list's own standing order; the header's chip picks it.
+    public var serversSort: ServersSort
 
     public init(
         selectedSubscriptionID: String? = nil,
         selectedProfileID: String? = nil,
         routingMode: RoutingMode = .global,
-        testURL: String = XrayConfigBuilder.defaultTestURL
+        testURL: String = XrayConfigBuilder.defaultTestURL,
+        serversSort: ServersSort = .default
     ) {
         self.selectedSubscriptionID = selectedSubscriptionID
         self.selectedProfileID = selectedProfileID
         self.routingMode = routingMode
         self.testURL = testURL
+        self.serversSort = serversSort
     }
 }
 
@@ -42,7 +46,8 @@ public enum ConnectionStore {
             selectedSubscriptionID: settings.selectedSubscriptionID,
             selectedProfileID: settings.selectedProfileID,
             routingMode: settings.routingMode,
-            testURL: settings.testURL.isEmpty ? XrayConfigBuilder.defaultTestURL : settings.testURL
+            testURL: settings.testURL.isEmpty ? XrayConfigBuilder.defaultTestURL : settings.testURL,
+            serversSort: settings.serversSort ?? .default
         )
     }
 
@@ -54,7 +59,8 @@ public enum ConnectionStore {
             selectedSubscriptionID: settings.selectedSubscriptionID,
             selectedProfileID: settings.selectedProfileID,
             routingMode: settings.routingMode,
-            testURL: settings.testURL
+            testURL: settings.testURL,
+            serversSort: settings.serversSort
         )
         guard let data = try? JSONEncoder().encode(snapshot) else { return }
         defaults.set(data, forKey: key)
@@ -77,5 +83,7 @@ public enum ConnectionStore {
         var selectedProfileID: String?
         var routingMode: RoutingMode
         var testURL: String
+        /// Optional so snapshots written before the sort existed decode as nil.
+        var serversSort: ServersSort?
     }
 }
