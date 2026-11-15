@@ -3,14 +3,30 @@ import NetworkExtension
 import Combine
 import ChumpyCore
 
-/// Root app state: owns the VPN profile manager and the tunnel status.
+/// Root app state: owns the VPN profile manager, the tunnel status and the
+/// profile store.
 @MainActor
 final class AppState: ObservableObject {
+
+    enum AppStateError: LocalizedError {
+        case noProfile
+
+        var errorDescription: String? {
+            switch self {
+            case .noProfile:
+                return String(localized: "error.noProfile", bundle: .main)
+            }
+        }
+    }
 
     @Published private(set) var status: NEVPNStatus = .invalid
     @Published private(set) var connectedDate: Date?
     @Published private(set) var isProcessing = true
     @Published var lastError: String?
+
+    /// The profile/subscription store the servers screen reads and the
+    /// connect flow resolves against.
+    let store = ProfileStore()
 
     private var manager: NETunnelProviderManager?
     private var cancellables = Set<AnyCancellable>()
@@ -87,6 +103,28 @@ final class AppState: ObservableObject {
     func connect() async {
         do {
             lastError = nil
+            // Resolve the profile and build the config the tunnel will run —
+            // the tunnel reads it fresh out of the shared defaults when it
+            // starts. Ported from the Android client's
+            // `MainViewModel.applyConfigAndConnect`.
+            guard let profile = store.selectedProfile() else {
+                throw AppStateError.noProfile
+            }
+            let members = store.resolvedMembers(for: profile)
+            let settings = ConnectionStore.current()
+            let config = try XrayConfigBuilder.buildFull(
+                profile: profile,
+                mode: settings.routingMode,
+                members: members,
+                testURL: settings.testURL
+            )
+            let defaults = ChumpyConstant.sharedDefaults
+            defaults.set(config, forKey: ChumpyConstant.Keys.tunnelConfigJSON)
+            defaults.set(
+                profile.remarks.isEmpty ? profile.server : profile.remarks,
+                forKey: ChumpyConstant.Keys.tunnelProfileName
+            )
+
             if manager == nil {
                 try await saveToPreferences()
                 // give the system a moment to register the new profile

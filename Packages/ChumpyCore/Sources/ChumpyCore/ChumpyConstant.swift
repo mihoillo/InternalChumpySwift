@@ -39,9 +39,15 @@ public enum ChumpyConstant {
         configsDir.appendingPathComponent("config_final.json")
     }
 
+    /// Directory holding the profile/subscription store files.
+    public static var storeDir: URL {
+        appGroupContainer
+            .appendingPathComponent("Library/Application Support/Store", isDirectory: true)
+    }
+
     public static func ensureDirectories() {
         let fm = FileManager.default
-        for dir in [dataDir, configsDir] {
+        for dir in [dataDir, configsDir, storeDir] {
             try? fm.createDirectory(at: dir, withIntermediateDirectories: true)
         }
     }

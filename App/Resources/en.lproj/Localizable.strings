@@ -42,3 +42,5 @@
 "routing.id" = "Bypass Indonesia";
 "routing.tr" = "Bypass Turkey";
 "routing.br" = "Bypass Brazil";
+
+"error.noProfile" = "No server selected. Add a subscription or paste a link in Servers.";
