@@ -14,6 +14,10 @@ public enum SubscriptionParser {
         if let configs = ConfigParser.parse(text) {
             return distinctByLinkKey(configs)
         }
+        // Clash YAML next — panels serve it to Clash-flavoured clients.
+        if let clash = ClashYamlParser.parse(text) {
+            return distinctByLinkKey(clash)
+        }
         let profiles = text
             .split(separator: "\n", omittingEmptySubsequences: true)
             .compactMap { LinkParsers.parse(String($0)) }

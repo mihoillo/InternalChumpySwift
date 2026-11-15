@@ -159,11 +159,15 @@ public enum ClashYamlParser {
         case nil:
             return ""
         case let map as [String: Any?]:
-            return hostOf(map["Host"] ?? map["host"])
+            let inner = map["Host"] ?? map["host"]
+            guard let value = inner else { return "" }
+            return hostOf(value)
         case let list as [Any?]:
             return list.map { stringify($0) }.joined(separator: ",")
-        case let scalar:
-            return "\(scalar)"
+        case let scalar as String:
+            return scalar
+        default:
+            return headers.map { "\($0)" } ?? ""
         }
     }
 }
