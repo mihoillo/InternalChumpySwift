@@ -131,7 +131,7 @@ public final class DailyTrafficStore {
         // The calendar's own day ordinal, not a UTC bucket: days are cut in
         // the device's zone, and a DST day is 23 or 25 hours long — an
         // 86400-based bucket would merge two local days once a year.
-        guard let ordinal = calendar.ordinality(of: .day, in: .era, of: date) else {
+        guard let ordinal = calendar.ordinality(of: .day, in: .era, for: date) else {
             return Int64(date.timeIntervalSince1970 / 86_400)
         }
         return Int64(ordinal)

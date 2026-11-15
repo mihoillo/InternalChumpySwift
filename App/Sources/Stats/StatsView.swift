@@ -147,7 +147,7 @@ private struct WeekTrafficCard: View {
     /// counting back from today's ordinal on the same calendar.
     private static func date(of day: DailyTraffic) -> Date {
         let calendar = Calendar.current
-        let todayOrdinal = calendar.ordinality(of: .day, in: .era, of: Date()) ?? 0
+        let todayOrdinal = calendar.ordinality(of: .day, in: .era, for: Date()) ?? 0
         let offset = todayOrdinal - Int(day.epochDay)
         return calendar.date(byAdding: .day, value: -offset, to: Date()) ?? Date()
     }
