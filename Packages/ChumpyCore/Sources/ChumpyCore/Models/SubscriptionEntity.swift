@@ -13,7 +13,7 @@ public let standaloneSubscriptionID = "standalone"
 /// `profile-title`/`content-disposition`, the refresh hint from
 /// `profile-update-interval`. Ported from the Android client's
 /// `SubscriptionEntity`.
-public struct Subscription: Codable, Equatable, Identifiable, Hashable {
+public struct SubscriptionEntity: Codable, Equatable, Identifiable, Hashable {
     public var id: String
     /// Display name; falls back to the host of `url` until the panel names it.
     public var name: String

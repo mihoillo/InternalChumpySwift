@@ -6,7 +6,7 @@ final class SubscriptionHeadersTests: XCTestCase {
 
     func testParseReadsAllInterestingHeaders() {
         let meta = SubscriptionHeaders.parse([
-            "Subscription-Userinfo": ["upload=111; download=222; total=333; expire=1700000000"],
+            "SubscriptionEntity-Userinfo": ["upload=111; download=222; total=333; expire=1700000000"],
             "Profile-Title": ["base64:" + LinkUtils.encodeBase64("Моя подписка")],
             "Profile-Update-Interval": ["12"],
             "Routing": [],

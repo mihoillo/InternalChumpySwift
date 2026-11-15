@@ -164,10 +164,10 @@ struct ServersView: View {
     }
 }
 
-// MARK: - Subscription card
+// MARK: - SubscriptionEntity card
 
 private struct SubscriptionCard: View {
-    let subscription: Subscription
+    let subscription: SubscriptionEntity
     @ObservedObject var model: ServersViewModel
 
     var body: some View {

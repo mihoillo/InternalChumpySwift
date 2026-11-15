@@ -9,7 +9,7 @@ import ChumpyCore
 @MainActor
 final class ServersViewModel: ObservableObject {
 
-    @Published private(set) var subscriptions: [Subscription] = []
+    @Published private(set) var subscriptions: [SubscriptionEntity] = []
     @Published private(set) var profiles: [Profile] = []
     @Published private(set) var selectedSubscriptionID: String?
     @Published private(set) var selectedProfileID: String?
@@ -28,10 +28,10 @@ final class ServersViewModel: ObservableObject {
     )
 
     /// The standalone group's synthetic card.
-    var selectedSubscription: Subscription? {
+    var selectedSubscription: SubscriptionEntity? {
         guard let id = selectedSubscriptionID else { return nil }
         if id == standaloneSubscriptionID {
-            return Subscription(
+            return SubscriptionEntity(
                 id: standaloneSubscriptionID,
                 name: String(localized: "servers.standalone", bundle: .main)
             )
@@ -95,7 +95,7 @@ final class ServersViewModel: ObservableObject {
     /// Adds a subscription by URL — or, for a paste without a scheme, treats
     /// it as manual profiles.
     func addSubscription(
-        url: String, name: String? = nil, onDone: (String?) -> Void = {}
+        url: String, name: String? = nil, onDone: (String?) -> Void = { _ in }
     ) async {
         let trimmed = url.trimmingCharacters(in: .whitespacesAndNewlines)
         let lowered = trimmed.lowercased()
@@ -120,7 +120,7 @@ final class ServersViewModel: ObservableObject {
 
     /// Manual import: a link, a WireGuard .conf body, a raw config, or a list
     /// of links.
-    func addManualProfiles(_ text: String, onDone: (String?) -> Void = {}) {
+    func addManualProfiles(_ text: String, onDone: (String?) -> Void = { _ in }) {
         do {
             let count = try store.addManualProfiles(text)
             if count > 0 {

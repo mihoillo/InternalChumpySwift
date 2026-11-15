@@ -1,6 +1,6 @@
 import Foundation
 
-/// Subscription lifecycle: adding, refreshing and deleting, on top of the
+/// SubscriptionEntity lifecycle: adding, refreshing and deleting, on top of the
 /// file store. A refresh replaces the subscription's profile rows wholesale,
 /// but profiles whose `linkKey` survives carry their identity — and with it
 /// the selection state and the last measured ping — over to the new rows.
@@ -14,7 +14,7 @@ extension ProfileStore {
 
         public var errorDescription: String? {
             switch self {
-            case .notFound: return "Subscription not found"
+            case .notFound: return "SubscriptionEntity not found"
             case .nothingParsed: return "No server links found in the response"
             }
         }
@@ -28,12 +28,12 @@ extension ProfileStore {
         name: String? = nil,
         body: String,
         metadata: SubscriptionMetadata
-    ) throws -> Subscription {
+    ) throws -> SubscriptionEntity {
         let parsed = try Self.parsedRows(body: body, metadata: metadata)
 
         let id = UUID().uuidString
         let now = Date()
-        let entity = Subscription(
+        let entity = SubscriptionEntity(
             id: id,
             name: name.flatMap { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
                 .flatMap { $0.isEmpty ? nil : $0 }
@@ -64,11 +64,11 @@ extension ProfileStore {
         id: String,
         body: String,
         metadata: SubscriptionMetadata
-    ) throws -> Subscription {
+    ) throws -> SubscriptionEntity {
         let parsed = try Self.parsedRows(body: body, metadata: metadata)
 
         return try queue.sync {
-            let subs: [Subscription] = read(subscriptionsFile)
+            let subs: [SubscriptionEntity] = read(subscriptionsFile)
             guard let index = subs.firstIndex(where: { $0.id == id }) else {
                 throw SubscriptionError.notFound
             }
@@ -97,7 +97,7 @@ extension ProfileStore {
     /// The failure lands on the card, not in a toast that is gone in a second.
     public func markSubscriptionUpdateFailed(id: String, message: String) {
         queue.sync {
-            var subs: [Subscription] = read(subscriptionsFile)
+            var subs: [SubscriptionEntity] = read(subscriptionsFile)
             guard let index = subs.firstIndex(where: { $0.id == id }) else { return }
             subs[index].lastUpdateAttempt = Date()
             subs[index].lastError = message
@@ -108,7 +108,7 @@ extension ProfileStore {
     /// Drops a subscription and its profiles wholesale.
     public func deleteSubscription(id: String) {
         queue.sync {
-            let subs: [Subscription] = read(subscriptionsFile)
+            let subs: [SubscriptionEntity] = read(subscriptionsFile)
             write(subs.filter { $0.id != id }, to: subscriptionsFile)
             let profiles: [Profile] = read(profilesFile)
             write(profiles.filter { $0.subscriptionID != id }, to: profilesFile)

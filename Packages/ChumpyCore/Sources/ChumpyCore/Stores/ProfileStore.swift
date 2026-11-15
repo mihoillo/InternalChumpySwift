@@ -67,15 +67,15 @@ public final class ProfileStore {
 
     // MARK: - Subscriptions
 
-    public func subscriptions() -> [Subscription] {
+    public func subscriptions() -> [SubscriptionEntity] {
         queue.sync { read(subscriptionsFile) }
     }
 
-    public func saveSubscriptions(_ subscriptions: [Subscription]) {
+    public func saveSubscriptions(_ subscriptions: [SubscriptionEntity]) {
         queue.sync { write(subscriptions, to: subscriptionsFile) }
     }
 
-    public func subscription(byID id: String) -> Subscription? {
+    public func subscription(byID id: String) -> SubscriptionEntity? {
         queue.sync { read(subscriptionsFile).first { $0.id == id } }
     }
 
