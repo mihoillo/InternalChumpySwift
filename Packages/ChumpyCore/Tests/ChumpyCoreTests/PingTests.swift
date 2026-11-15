@@ -36,12 +36,14 @@ final class PingConfigTests: XCTestCase {
         XCTAssertEqual(1, outbounds.count)
         XCTAssertEqual(XrayConfigBuilder.proxyTag, outbounds[0]["tag"] as? String)
         let routing = try XCTUnwrap(config["routing"] as? [String: Any])
-        XCTAssertEqual([], (routing["rules"] as? [Any]) ?? [1])
+        let rules = try XCTUnwrap(routing["rules"] as? [Any])
+        XCTAssertEqual(0, rules.count)
     }
 
     func testBuildTestItselfHasNoInbounds() throws {
         let config = try objectOf(XrayConfigBuilder.buildTest(profile))
-        XCTAssertEqual([], (config["inbounds"] as? [Any]) ?? [1])
+        let inbounds = try XCTUnwrap(config["inbounds"] as? [Any])
+        XCTAssertEqual(0, inbounds.count)
     }
 
     func testPingProxyURL() {
