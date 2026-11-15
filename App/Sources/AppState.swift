@@ -28,10 +28,23 @@ final class AppState: ObservableObject {
     /// connect flow resolves against.
     let store = ProfileStore()
 
+    /// Geodata downloads ride the tunnel's loopback SOCKS while it is up —
+    /// the same policy as subscription updates.
+    private lazy var geodataFetcher = SubscriptionFetcher(
+        tunnelUp: { [weak self] in
+            self?.status == .connected
+        }
+    )
+
     private var manager: NETunnelProviderManager?
     private var cancellables = Set<AnyCancellable>()
 
     init() {
+        // The bundled geo databases go to the core's asset directory each
+        // start — a build with changed databases always wins over whatever
+        // an older one had left on the device. Ported from the Android
+        // client's `XrayCore.copyGeoAssets`.
+        GeodataFiles.seedBundled()
         Task(priority: .userInitiated) {
             await reload()
             isProcessing = false
@@ -123,11 +136,26 @@ final class AppState: ObservableObject {
             }
             let members = store.resolvedMembers(for: profile)
             let settings = ConnectionStore.current()
-            let config = try XrayConfigBuilder.buildFull(
+            var config = try XrayConfigBuilder.buildFull(
                 profile: profile,
                 mode: settings.routingMode,
                 members: members,
                 testURL: settings.testURL
+            )
+            // Geodata: the routing's references aimed at files the asset
+            // directory actually holds — cached, downloaded, or already
+            // there. Ported from `repository.prepareGeodata`.
+            config = try await GeodataFiles.shared.prepare(
+                config: config,
+                sources: profile.geodataSources,
+                directory: ChumpyConstant.dataDir,
+                allowStandardFallback:
+                    settings.routingMode == .global && !profile.routingRules.isEmpty,
+                protectedConfig: ChumpyConstant.sharedDefaults
+                    .string(forKey: ChumpyConstant.Keys.tunnelConfigJSON),
+                fetch: { url, target in
+                    try await geodataFetcher.fetchGeodata(url, to: target)
+                }
             )
             let defaults = ChumpyConstant.sharedDefaults
             defaults.set(config, forKey: ChumpyConstant.Keys.tunnelConfigJSON)

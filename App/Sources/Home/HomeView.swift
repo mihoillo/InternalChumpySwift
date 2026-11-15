@@ -5,6 +5,9 @@ import ChumpyCore
 struct HomeView: View {
     @EnvironmentObject private var appState: AppState
     @State private var now = Date()
+    /// The live delay through the running tunnel; nil until measured.
+    @State private var liveDelay: Int?
+    @State private var liveDelayTask: Task<Void, Never>?
 
     private let ticker = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
 
@@ -28,6 +31,59 @@ struct HomeView: View {
             .navigationTitle("Chumpy")
         }
         .onReceive(ticker) { now = $0 }
+        .onAppear { startLiveDelayIfUp() }
+        .onChange(of: appState.status) { _ in startLiveDelayIfUp() }
+        .onDisappear {
+            liveDelayTask?.cancel()
+            liveDelayTask = nil
+        }
+    }
+
+    // MARK: - Live delay
+
+    /// While the tunnel stands, the delay is the real thing: a plain
+    /// request through the running core's own loopback SOCKS inbound, timed
+    /// with a watch — the chip answers with the tunnel's own number, not a
+    /// throwaway core's. Ported from the Android client's home ping chip.
+    private func startLiveDelayIfUp() {
+        liveDelayTask?.cancel()
+        liveDelayTask = nil
+        guard appState.status == .connected || appState.status == .reasserting
+        else {
+            liveDelay = nil
+            return
+        }
+        liveDelayTask = Task {
+            while !Task.isCancelled {
+                liveDelay = await Self.measureLiveDelay()
+                guard !Task.isCancelled else { break }
+                try? await Task.sleep(nanoseconds: 30_000_000_000)
+            }
+        }
+    }
+
+    static func measureLiveDelay() async -> Int? {
+        var configuration = URLSessionConfiguration.ephemeral
+        configuration.connectionProxyDictionary = [
+            kCFStreamPropertySOCKSProxyHost as String: "127.0.0.1",
+            kCFStreamPropertySOCKSProxyPort as String: XrayConfigBuilder.localSocksPort,
+        ]
+        configuration.timeoutIntervalForRequest = 5
+        configuration.timeoutIntervalForResource = 10
+        let session = URLSession(configuration: configuration)
+        defer { session.finishTasksAndInvalidate() }
+        guard let url = URL(string: ConnectionStore.current().testURL) else { return nil }
+        let started = Date()
+        do {
+            let (_, response) = try await session.data(for: URLRequest(url: url))
+            guard let http = response as? HTTPURLResponse,
+                  (200..<400).contains(http.statusCode)
+            else { return nil }
+            let millis = Int(Date().timeIntervalSince(started) * 1000)
+            return millis
+        } catch {
+            return nil
+        }
     }
 
     // MARK: - Profile card
@@ -125,8 +181,14 @@ struct HomeView: View {
         HStack(spacing: 10) {
             InfoChip(icon: "clock", title: "home.uptime", value: uptimeText)
             InfoChip(icon: "arrow.down.arrow.up", title: "home.traffic", value: trafficText)
+            InfoChip(icon: "bolt.horizontal", title: "home.ping", value: pingText)
         }
         .padding(.horizontal, 20)
+    }
+
+    private var pingText: String {
+        guard let liveDelay else { return "—" }
+        return "\(liveDelay) ms"
     }
 
     private var uptimeText: String {

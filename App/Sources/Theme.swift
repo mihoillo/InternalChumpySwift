@@ -9,26 +9,50 @@ enum Chumpy {
 }
 
 // MARK: - Glass background
-// Frosted glass (iOS 15+ materials) is the baseline everywhere.
-//
-// TODO(Liquid Glass): once the project is built with the iOS 26 SDK,
-// replace the material with `.glassEffect()` gated by `#available(iOS 26, *)`
-// (see docs: "Applying Liquid Glass to custom views"). The `.capsule` variant
-// here is exactly the modifier that will migrate — the floating pill bar.
+// Liquid Glass (iOS 26+) where the platform has it, the frosted material
+// (iOS 15+) everywhere else — the baseline look stays native either way.
 
 extension View {
 
-    /// Frosted-glass background. Liquid Glass comes later (iOS 26+).
+    /// Glass background: `.glassEffect()` on iOS 26, `.regularMaterial`
+    /// below.
+    @ViewBuilder
     func chumpyGlassCard(cornerRadius: CGFloat = 20) -> some View {
-        background(
-            .regularMaterial,
-            in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-        )
+        if #available(iOS 26.0, *) {
+            glassEffect(
+                in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+            )
+        } else {
+            background(
+                .regularMaterial,
+                in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+            )
+        }
     }
 
-    /// Frosted-glass capsule (floating pill bar, chips).
+    /// Glass capsule (floating pill bar, chips): `.glassEffect()` on
+    /// iOS 26, `.ultraThinMaterial` below.
+    @ViewBuilder
     func chumpyGlassCapsule() -> some View {
-        background(.ultraThinMaterial, in: Capsule())
+        if #available(iOS 26.0, *) {
+            glassEffect(in: Capsule())
+        } else {
+            background(.ultraThinMaterial, in: Capsule())
+        }
+    }
+
+    /// The pill's own edge treatment: Liquid Glass carries its own, the
+    /// material capsule needs the hairline stroke and the shadow.
+    @ViewBuilder
+    func chumpyPillEdge() -> some View {
+        if #available(iOS 26.0, *) {
+            self
+        } else {
+            overlay(
+                Capsule().strokeBorder(Color.primary.opacity(0.06), lineWidth: 0.5)
+            )
+            .shadow(color: .black.opacity(0.16), radius: 16, y: 8)
+        }
     }
 }
 

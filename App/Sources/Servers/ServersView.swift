@@ -55,8 +55,15 @@ struct ServersView: View {
             Section {
                 ForEach(model.profiles) { profile in
                     ServerRow(profile: profile, isSelected: isSelected(profile))
+                        .opacity(profile.concealed ? 0.45 : 1)
                         .contentShape(Rectangle())
-                        .onTapGesture { select(profile) }
+                        .onTapGesture {
+                            // A concealed row stands where it always stood
+                            // but stays out of play: the menu's own
+                            // "reveal" is its way back.
+                            if !profile.concealed { select(profile) }
+                        }
+                        .contextMenu { rowMenu(profile) }
                         .swipeActions(edge: .trailing, allowsFullSwipe: false) {
                             if model.isStandaloneSelected {
                                 Button(role: .destructive) {
@@ -70,8 +77,20 @@ struct ServersView: View {
             } header: {
                 HStack {
                     Text("servers.group.title")
+                    Spacer()
+                    if model.concealedCount > 0 {
+                        Button {
+                            model.setRevealConcealed(!model.includeConcealed)
+                        } label: {
+                            Label(
+                                "\(model.concealedCount)",
+                                systemImage: model.includeConcealed ? "eye" : "eye.slash"
+                            )
+                            .font(.caption)
+                        }
+                        .buttonStyle(.borderless)
+                    }
                     if model.isPinging {
-                        Spacer()
                         ProgressView()
                     }
                 }
@@ -93,6 +112,40 @@ struct ServersView: View {
         Task {
             await appState.selectProfile(id: profile.id)
             model.reload()
+        }
+    }
+
+    /// The row's own menu: the pin, the hide, the test. Ported from the
+    /// Android client's `RowMenu` — the delete keeps its swipe, the copy
+    /// waits for v2 (no link sharing without a share sheet yet).
+    @ViewBuilder
+    private func rowMenu(_ profile: Profile) -> some View {
+        Button {
+            model.togglePinned(profile)
+        } label: {
+            if profile.pinned {
+                Label("servers.row.unpin", systemImage: "pin.slash")
+            } else {
+                Label("servers.row.pin", systemImage: "pin")
+            }
+        }
+        if profile.concealed {
+            Button {
+                model.setConcealed(profile, concealed: false)
+            } label: {
+                Label("servers.row.reveal", systemImage: "eye")
+            }
+        } else {
+            Button {
+                model.setConcealed(profile, concealed: true)
+            } label: {
+                Label("servers.row.hide", systemImage: "eye.slash")
+            }
+        }
+        Button {
+            Task { await model.pingOne(profile) }
+        } label: {
+            Label("servers.row.test", systemImage: "bolt.horizontal")
         }
     }
 
@@ -316,6 +369,11 @@ private struct ServerRow: View {
                 }
             }
             Spacer()
+            if profile.pinned {
+                Image(systemName: "pin.fill")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
             if let delay = profile.testDelayMillis, delay > 0 {
                 Text("\(delay) ms")
                     .font(.caption.monospacedDigit())

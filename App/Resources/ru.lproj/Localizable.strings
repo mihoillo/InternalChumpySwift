@@ -15,12 +15,18 @@
 "home.status.disconnected" = "Отключено";
 "home.uptime" = "Время";
 "home.traffic" = "Трафик";
+"home.ping" = "Пинг";
 
 "servers.empty.title" = "Пока нет серверов";
 "servers.empty.subtitle" = "Добавьте подписку или вставьте ссылку.";
 "servers.standalone" = "Вручную";
 "servers.group.title" = "Серверы";
 "servers.delete" = "Удалить";
+"servers.row.pin" = "Закрепить";
+"servers.row.unpin" = "Открепить";
+"servers.row.hide" = "Скрыть";
+"servers.row.reveal" = "Показать";
+"servers.row.test" = "Проверить";
 "servers.updated" = "Обновлено %@";
 "servers.expiresInDays" = "Истекает через %d дн.";
 "servers.expired" = "Истекла";

@@ -1,8 +1,8 @@
 import SwiftUI
 
-/// The app shell: full-screen content with a floating frosted-glass pill bar,
-/// mirroring the Android client's MainShell pill (to be upgraded to real
-/// Liquid Glass on iOS 26 later).
+/// The app shell: full-screen content with a floating glass pill bar,
+/// mirroring the Android client's MainShell pill — Liquid Glass on iOS 26,
+/// frosted material below.
 struct MainShellView: View {
     @EnvironmentObject private var appState: AppState
     @State private var page: Page = .home
@@ -56,7 +56,8 @@ struct MainShellView: View {
     }
 }
 
-/// The floating pill: frosted material capsule with a sliding selection pill.
+/// The floating pill: glass capsule with a sliding selection pill —
+/// Liquid Glass on iOS 26, frosted material below.
 struct FloatingPillBar: View {
     @Binding var selection: MainShellView.Page
 
@@ -67,12 +68,10 @@ struct FloatingPillBar: View {
             }
         }
         .padding(6)
+        .frame(maxWidth: .infinity)
         .chumpyGlassCapsule()
         .clipShape(Capsule())
-        .overlay(
-            Capsule().strokeBorder(Color.primary.opacity(0.06), lineWidth: 0.5)
-        )
-        .shadow(color: .black.opacity(0.16), radius: 16, y: 8)
+        .chumpyPillEdge()
     }
 
     private func pillButton(for page: MainShellView.Page) -> some View {

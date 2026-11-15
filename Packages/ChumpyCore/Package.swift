@@ -18,7 +18,10 @@ let package = Package(
         .testTarget(
             name: "ChumpyCoreTests",
             dependencies: ["ChumpyCore"],
-            path: "Tests/ChumpyCoreTests"
+            path: "Tests/ChumpyCoreTests",
+            resources: [
+                .copy("Geodata")
+            ]
         )
     ]
 )

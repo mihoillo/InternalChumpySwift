@@ -18,7 +18,13 @@ final class ServersViewModel: ObservableObject {
     @Published private(set) var isPinging = false
     /// How many standalone configs wait outside any subscription.
     @Published private(set) var manualProfileCount = 0
+    /// How many rows stand concealed behind the group's reveal chip.
+    @Published private(set) var concealedCount = 0
     @Published var error: String?
+
+    /// Whether the concealed rows stand in the list — the reveal mode's
+    /// own flag; the view toggles it with the header's chip.
+    var includeConcealed = false
 
     /// Whether a fetch should ride the running core's SOCKS inbound; the view
     /// binds it to the tunnel status on appear.
@@ -77,8 +83,19 @@ final class ServersViewModel: ObservableObject {
         selectedSubscriptionID = resolved
         selectedProfileID = settings.selectedProfileID
         let groupID = resolved == standaloneSubscriptionID ? nil : resolved
-        profiles = store.profiles(ofSubscription: groupID)
-            .filter { !$0.hidden && !$0.concealed }
+        let groupRows = store.profiles(ofSubscription: groupID)
+        concealedCount = groupRows
+            .filter { !$0.hidden && $0.concealed }.count
+        // The pinned rows keep the top whatever the order says; the rest
+        // follow the subscription's own order. Ported from the Android
+        // client's `ServersSort.DEFAULT`.
+        profiles = groupRows
+            .filter { !$0.hidden && (includeConcealed || !$0.concealed) }
+            .sorted { lhs, rhs in
+                if lhs.pinned != rhs.pinned { return lhs.pinned }
+                if lhs.order != rhs.order { return lhs.order < rhs.order }
+                return lhs.remarks < rhs.remarks
+            }
         error = nil
     }
 
@@ -203,6 +220,40 @@ final class ServersViewModel: ObservableObject {
             ConnectionStore.update { $0.selectedProfileID = nil }
         }
         reload()
+    }
+
+    // MARK: - Row actions
+
+    /// Pins or unpins a row — the pinned rows keep the top.
+    func togglePinned(_ profile: Profile) {
+        store.setProfilePinned(id: profile.id, pinned: !profile.pinned)
+        reload()
+    }
+
+    /// Hides a row in the list or stands it back — the group's reveal chip
+    /// is its way back. Ported from the Android client's row menu.
+    func setConcealed(_ profile: Profile, concealed: Bool) {
+        store.setProfileConcealed(id: profile.id, concealed: concealed)
+        reload()
+    }
+
+    /// The reveal mode's own switch: the concealed rows stand in the list
+    /// (dimmed, out of play) or fold away behind the chip again.
+    func setRevealConcealed(_ on: Bool) {
+        includeConcealed = on
+        reload()
+    }
+
+    /// One row's own test — a single measurement core, its chip answering
+    /// with its own number. Ported from the Android client's row menu
+    /// "test" path.
+    func pingOne(_ profile: Profile) async {
+        guard profile.type != .balancer else { return }
+        let delay = DelayTester.measure(
+            profile: profile, testURL: ConnectionStore.current().testURL
+        )
+        store.setProfileDelays([(profile.id, delay)], testedAt: Date())
+        reloadPreservingSweepState()
     }
 
     // MARK: - Real pings

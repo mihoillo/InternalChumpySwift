@@ -15,12 +15,18 @@
 "home.status.disconnected" = "Disconnected";
 "home.uptime" = "Uptime";
 "home.traffic" = "Traffic";
+"home.ping" = "Ping";
 
 "servers.empty.title" = "No servers yet";
 "servers.empty.subtitle" = "Add a subscription or paste a share link.";
 "servers.standalone" = "Standalone";
 "servers.group.title" = "Servers";
 "servers.delete" = "Delete";
+"servers.row.pin" = "Pin";
+"servers.row.unpin" = "Unpin";
+"servers.row.hide" = "Hide";
+"servers.row.reveal" = "Show";
+"servers.row.test" = "Test";
 "servers.updated" = "Updated %@";
 "servers.expiresInDays" = "Expires in %d days";
 "servers.expired" = "Expired";

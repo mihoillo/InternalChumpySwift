@@ -24,6 +24,7 @@ public final class SubscriptionFetcher {
 
     public enum FetchError: Error, LocalizedError {
         case badURL
+        case badGeodataURL
         case http(Int)
         case emptyBody
         case tooLarge
@@ -31,6 +32,8 @@ public final class SubscriptionFetcher {
         public var errorDescription: String? {
             switch self {
             case .badURL: return "Not a valid URL"
+            case .badGeodataURL:
+                return "Geodata requires an HTTPS URL without embedded credentials"
             case .http(let code): return "HTTP \(code)"
             case .emptyBody: return "Empty subscription body"
             case .tooLarge: return "Subscription body too large"
@@ -90,6 +93,45 @@ public final class SubscriptionFetcher {
         return FetchResult(body: second.body, metadata: metadata)
     }
 
+    // MARK: - Geodata
+
+    /// Downloads a provider geodata database to a file. Ported from the
+    /// Android client's `fetchGeodata`: HTTPS without embedded credentials
+    /// only, gzip transparently handled, the database's own 64 MiB cap.
+    public func fetchGeodata(_ rawURL: String, to target: URL) async throws {
+        let url = try Self.validatedGeodataURL(rawURL)
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        request.setValue(Self.userAgent, forHTTPHeaderField: "User-Agent")
+        request.setValue("*/*", forHTTPHeaderField: "Accept")
+        let (data, response) = try await Self.run(
+            request, tunnelUp: tunnelUp(), maxBytes: GeodataCategories.maxBytes
+        )
+        guard (200..<300).contains(response.statusCode) else {
+            throw FetchError.http(response.statusCode)
+        }
+        let finalURL = response.url ?? url
+        // A redirect that left HTTPS is not a redirect we take.
+        guard let scheme = finalURL.scheme?.lowercased(), scheme == "https",
+              finalURL.user == nil, finalURL.password == nil
+        else { throw FetchError.badGeodataURL }
+
+        let payload = Self.ungzipped(data)
+        guard !payload.isEmpty else { throw FetchError.emptyBody }
+        try payload.write(to: target, options: .atomic)
+    }
+
+    /// Geodata is routing-trusted content: HTTPS without embedded
+    /// credentials, nothing less.
+    public static func validatedGeodataURL(_ rawURL: String) throws -> URL {
+        guard let url = URL(string: rawURL),
+              let scheme = url.scheme?.lowercased(), scheme == "https",
+              url.host != nil,
+              (url.user ?? "").isEmpty, (url.password ?? "").isEmpty
+        else { throw FetchError.badGeodataURL }
+        return url
+    }
+
     // MARK: - URL helpers
 
     /// A subscription URL without a scheme means https; hosts serving plain
@@ -126,7 +168,7 @@ public final class SubscriptionFetcher {
     /// async `data(for:)` does not give (it throws on non-2xx before the
     /// status code can be read).
     private static func run(
-        _ request: URLRequest, tunnelUp: Bool
+        _ request: URLRequest, tunnelUp: Bool, maxBytes: Int = maxBodyBytes
     ) async throws -> (Data, HTTPURLResponse) {
         let session = URLSession(configuration: sessionConfiguration(tunnelUp: tunnelUp))
         defer { session.finishTasksAndInvalidate() }
@@ -141,7 +183,7 @@ public final class SubscriptionFetcher {
                     return
                 }
                 let bytes = data ?? Data()
-                if bytes.count > maxBodyBytes {
+                if bytes.count > maxBytes {
                     continuation.resume(throwing: FetchError.tooLarge)
                     return
                 }

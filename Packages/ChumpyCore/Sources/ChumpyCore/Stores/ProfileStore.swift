@@ -90,6 +90,31 @@ public final class ProfileStore {
         }
     }
 
+    /// Pins or unpins a row — a targeted update, the row's identity
+    /// untouched. Ported from the Android client's `profiles.setPinned`.
+    public func setProfilePinned(id: String, pinned: Bool) {
+        queue.sync {
+            var profiles: [Profile] = read(profilesFile)
+            guard let index = profiles.firstIndex(where: { $0.id == id })
+            else { return }
+            profiles[index].pinned = pinned
+            write(profiles, to: profilesFile)
+        }
+    }
+
+    /// Hides or reveals a row in the list — a targeted update, the row's
+    /// identity untouched. Ported from the Android client's
+    /// `profiles.setConcealed`.
+    public func setProfileConcealed(id: String, concealed: Bool) {
+        queue.sync {
+            var profiles: [Profile] = read(profilesFile)
+            guard let index = profiles.firstIndex(where: { $0.id == id })
+            else { return }
+            profiles[index].concealed = concealed
+            write(profiles, to: profilesFile)
+        }
+    }
+
     /// Stores measured pings on profile rows, for the list's chips — a
     /// targeted update, the rows' identities untouched. A nil delay marks
     /// "tested, unreachable". Ported from the Android client's

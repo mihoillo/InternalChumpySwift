@@ -228,4 +228,50 @@ final class ProfileStoreTests: XCTestCase {
         store.deleteManualProfiles()
         XCTAssertEqual(["sub.example.com"], store.profiles().map(\.server))
     }
+
+    // MARK: - Pin and conceal
+
+    func testSetProfilePinnedIsTargeted() {
+        let first = vless("one.example.com")
+        let second = vless("two.example.com")
+        store.saveProfiles([first, second])
+
+        store.setProfilePinned(id: first.id, pinned: true)
+        XCTAssertEqual(
+            [true, false],
+            store.profiles().map(\.pinned),
+            "only the named row moves"
+        )
+        // A targeted update: the identity fields stand.
+        XCTAssertEqual(first.id, store.profile(byID: first.id)?.id)
+        XCTAssertEqual("one.example.com", store.profile(byID: first.id)?.server)
+
+        store.setProfilePinned(id: first.id, pinned: false)
+        XCTAssertEqual([false, false], store.profiles().map(\.pinned))
+    }
+
+    func testSetProfilePinnedIgnoresMissingID() {
+        store.saveProfiles([vless("one.example.com")])
+        store.setProfilePinned(id: "no-such-row", pinned: true)
+        XCTAssertEqual([false], store.profiles().map(\.pinned))
+    }
+
+    func testSetProfileConcealedHidesFromVisible() {
+        let first = vless("one.example.com")
+        let second = vless("two.example.com")
+        store.saveProfiles([first, second])
+
+        store.setProfileConcealed(id: second.id, concealed: true)
+        XCTAssertEqual(["one.example.com"], store.visibleProfiles().map(\.server))
+        XCTAssertEqual(2, store.profiles().count, "the store keeps the concealed row")
+
+        store.setProfileConcealed(id: second.id, concealed: false)
+        XCTAssertEqual(2, store.visibleProfiles().count)
+    }
+
+    func testSetProfileConcealedIgnoresMissingID() {
+        store.saveProfiles([vless("one.example.com")])
+        store.setProfileConcealed(id: "no-such-row", concealed: true)
+        XCTAssertEqual(1, store.visibleProfiles().count)
+    }
 }
