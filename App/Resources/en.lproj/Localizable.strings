@@ -94,3 +94,6 @@
 "servers.updatedAt" = "Updated at %@";
 "servers.daysLeft" = "%d days left";
 "servers.deleteSubscription" = "Delete subscription";
+
+"servers.subscriptions" = "Subscriptions";
+"servers.standalone.subtitle" = "%d configs";

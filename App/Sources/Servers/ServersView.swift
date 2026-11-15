@@ -11,6 +11,7 @@ struct ServersView: View {
     @StateObject private var model = ServersViewModel()
     @State private var showAddSubscription = false
     @State private var showPasteLinks = false
+    @State private var showSubscriptionChooser = false
 
     var body: some View {
         NavHost {
@@ -39,6 +40,13 @@ struct ServersView: View {
         .sheet(isPresented: $showPasteLinks) {
             PasteLinksSheet(model: model)
         }
+        .sheet(isPresented: $showSubscriptionChooser) {
+            SubscriptionChooserSheet(model: model) {
+                showAddSubscription = true
+            } showPasteLinks: {
+                showPasteLinks = true
+            }
+        }
     }
 
     // MARK: - List
@@ -51,8 +59,11 @@ struct ServersView: View {
                 }
                 if let sub = model.selectedSubscription {
                     SubscriptionCard(subscription: sub, model: model)
-                        .contextMenu {
-                            subscriptionMenu
+                        .contentShape(Rectangle())
+                        .onTapGesture {
+                            // The card's own tap asks which group to show —
+                            // the chooser sheet with the thick rows.
+                            showSubscriptionChooser = true
                         }
                 }
                 header
@@ -180,78 +191,6 @@ struct ServersView: View {
             return false
         }
         return Double(sub.expireEpochSeconds) < Date().timeIntervalSince1970
-    }
-
-    // MARK: - Subscription menu
-
-    /// The card's own tap asks which group to show — the chooser's ask on
-    /// iOS is the context menu, carrying the group list, the auto-update
-    /// toggle and the group's own delete.
-    @ViewBuilder
-    private var subscriptionMenu: some View {
-        if model.manualProfileCount > 0 {
-            subscriptionPickerRow(
-                id: standaloneSubscriptionID,
-                name: String(localized: "servers.standalone", bundle: .main)
-            )
-        }
-        ForEach(model.subscriptions) { sub in
-            subscriptionPickerRow(
-                id: sub.id,
-                name: sub.name.isEmpty ? sub.url : sub.name
-            )
-        }
-        Divider()
-        autoUpdateToggle
-        Divider()
-        Button {
-            showAddSubscription = true
-        } label: {
-            Label("servers.add.subscription", systemImage: "link.badge.plus")
-        }
-        Button {
-            showPasteLinks = true
-        } label: {
-            Label("servers.add.paste", systemImage: "doc.on.clipboard")
-        }
-        Divider()
-        Button(role: .destructive) {
-            if let id = model.selectedSubscriptionID {
-                model.deleteSubscription(id)
-            }
-        } label: {
-            Label("servers.deleteSubscription", systemImage: "trash")
-        }
-    }
-
-    /// The per-subscription auto-update switch, inside the card's own menu —
-    /// the Android client's own arrangement.
-    @ViewBuilder
-    private var autoUpdateToggle: some View {
-        if let id = model.selectedSubscriptionID, !model.isStandaloneSelected,
-           let sub = model.subscriptions.first(where: { $0.id == id }) {
-            Button {
-                model.setSubscriptionAutoUpdate(id: id, enabled: !sub.autoUpdate)
-            } label: {
-                if sub.autoUpdate {
-                    Label("servers.autoUpdate", systemImage: "checkmark")
-                } else {
-                    Text("servers.autoUpdate")
-                }
-            }
-        }
-    }
-
-    private func subscriptionPickerRow(id: String, name: String) -> some View {
-        Button {
-            model.selectSubscription(id)
-        } label: {
-            if model.selectedSubscriptionID == id {
-                Label(name, systemImage: "checkmark")
-            } else {
-                Text(name)
-            }
-        }
     }
 
     // MARK: - Empty state
@@ -655,6 +594,221 @@ private struct ServerGroupRow: View {
                 Label("servers.delete", systemImage: "trash")
             }
         }
+    }
+}
+
+// MARK: - Subscription chooser sheet
+
+/// The groups' own chooser: the subscription card's tap opens it, and every
+/// option stands as a thick Chumpy row — the database tile, the name, the
+/// host under it, the checkmark on the standing one — with the auto-update
+/// switch, the add actions and the delete at the bottom.
+private struct SubscriptionChooserSheet: View {
+    @ObservedObject var model: ServersViewModel
+    var onAddSubscription: () -> Void
+    var showPasteLinks: () -> Void
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavHost {
+            ScrollView {
+                VStack(spacing: 8) {
+                    if model.manualProfileCount > 0 {
+                        row(
+                            id: standaloneSubscriptionID,
+                            name: String(localized: "servers.standalone", bundle: .main),
+                            subtitle: String(
+                                format: NSLocalizedString(
+                                    "servers.standalone.subtitle", bundle: .main, comment: ""
+                                ),
+                                model.manualProfileCount
+                            )
+                        )
+                    }
+                    ForEach(model.subscriptions) { sub in
+                        row(
+                            id: sub.id,
+                            name: sub.name.isEmpty ? sub.url : sub.name,
+                            subtitle: sub.url
+                        )
+                    }
+
+                    if let sub = model.selectedSubscription,
+                       sub.id != standaloneSubscriptionID {
+                        autoUpdateRow(sub)
+                        deleteRow(sub)
+                    }
+
+                    addActionRow(
+                        titleKey: "servers.add.subscription",
+                        icon: "link.badge.plus",
+                        action: {
+                            dismiss()
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.45) {
+                                onAddSubscription()
+                            }
+                        }
+                    )
+                    addActionRow(
+                        titleKey: "servers.add.paste",
+                        icon: "doc.on.clipboard",
+                        action: {
+                            dismiss()
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.45) {
+                                showPasteLinks()
+                            }
+                        }
+                    )
+                }
+                .padding(.horizontal, 16)
+                .padding(.top, 12)
+                .padding(.bottom, 16)
+            }
+            .navigationTitle("servers.subscriptions")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("common.cancel") { dismiss() }
+                }
+            }
+        }
+    }
+
+    /// One thick group row: 64pt minimum, the tile, the name over the host,
+    /// the standing one painted tonal with its checkmark.
+    private func row(id: String, name: String, subtitle: String) -> some View {
+        let isSelected = model.selectedSubscriptionID == id
+
+        return Button {
+            model.selectSubscription(id)
+            dismiss()
+        } label: {
+            HStack(spacing: 16) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .fill(isSelected ? Chumpy.accent : Chumpy.secondaryContainer)
+                        .frame(width: 40, height: 40)
+                    Image(systemName: "externaldrive.fill")
+                        .font(.system(size: 17, weight: .medium))
+                        .foregroundStyle(isSelected ? Color.white : Color.accentColor)
+                }
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(name)
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(.primary)
+                        .lineLimit(1)
+                    Text(subtitle)
+                        .font(.system(size: 12))
+                        .foregroundStyle(Color.secondary)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                }
+                Spacer(minLength: 8)
+                if isSelected {
+                    Image(systemName: "checkmark")
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(Color.accentColor)
+                }
+            }
+            .padding(16)
+            .frame(minHeight: 64)
+            .background(
+                RoundedRectangle(cornerRadius: 20, style: .continuous)
+                    .fill(isSelected ? Chumpy.primaryContainer : Chumpy.surfaceContainerLow)
+            )
+        }
+        .buttonStyle(.plain)
+    }
+
+    /// The standing subscription's own background refresh switch.
+    private func autoUpdateRow(_ sub: SubscriptionEntity) -> some View {
+        HStack(spacing: 16) {
+            ZStack {
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .fill(Chumpy.secondaryContainer)
+                    .frame(width: 40, height: 40)
+                Image(systemName: "arrow.triangle.2.circlepath")
+                    .font(.system(size: 16, weight: .medium))
+                    .foregroundStyle(Color.accentColor)
+            }
+            Text("servers.autoUpdate")
+                .font(.system(size: 16, weight: .medium))
+            Spacer()
+            Toggle(
+                isOn: Binding(
+                    get: { sub.autoUpdate },
+                    set: { model.setSubscriptionAutoUpdate(id: sub.id, enabled: $0) }
+                )
+            ) {}
+            .labelsHidden()
+            .tint(Chumpy.accent)
+        }
+        .padding(16)
+        .frame(minHeight: 64)
+        .background(
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .fill(Chumpy.surfaceContainerLow)
+        )
+    }
+
+    /// The group's own delete — the whole subscription with everything it
+    /// brought in, or the standalone group.
+    private func deleteRow(_ sub: SubscriptionEntity) -> some View {
+        Button {
+            model.deleteSubscription(sub.id)
+            dismiss()
+        } label: {
+            HStack(spacing: 16) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .fill(Color.red.opacity(0.14))
+                        .frame(width: 40, height: 40)
+                    Image(systemName: "trash")
+                        .font(.system(size: 16, weight: .medium))
+                        .foregroundStyle(Color.red)
+                }
+                Text("servers.deleteSubscription")
+                    .font(.system(size: 16, weight: .medium))
+                    .foregroundStyle(Color.red)
+                Spacer()
+            }
+            .padding(16)
+            .frame(minHeight: 64)
+            .background(
+                RoundedRectangle(cornerRadius: 20, style: .continuous)
+                    .fill(Chumpy.surfaceContainerLow)
+            )
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func addActionRow(titleKey: LocalizedStringKey, icon: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            HStack(spacing: 16) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .fill(Chumpy.secondaryContainer)
+                        .frame(width: 40, height: 40)
+                    Image(systemName: icon)
+                        .font(.system(size: 16, weight: .medium))
+                        .foregroundStyle(Color.accentColor)
+                }
+                Text(titleKey)
+                    .font(.system(size: 16, weight: .medium))
+                    .foregroundStyle(.primary)
+                Spacer()
+                Image(systemName: "plus")
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundStyle(Color.secondary)
+            }
+            .padding(16)
+            .frame(minHeight: 64)
+            .background(
+                RoundedRectangle(cornerRadius: 20, style: .continuous)
+                    .fill(Chumpy.surfaceContainerLow)
+            )
+        }
+        .buttonStyle(.plain)
     }
 }
 

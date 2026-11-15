@@ -3,12 +3,14 @@ import SwiftUI
 /// The app shell: full-screen content with Chumpy's two-pill floating bar —
 /// the tabs' pill on the left, the round gear button on the right. Ported
 /// from the Android client's `FloatingBottomBar`: Liquid Glass on iOS 26,
-/// frosted material below.
+/// frosted material below. The indicator slides between the tabs, the
+/// pages crossfade, the gear turns on its own hinge.
 struct MainShellView: View {
     @EnvironmentObject private var appState: AppState
     @State private var page: Page = .home
     /// The tab the gear folds back to — the last one that stood.
     @State private var lastTab: Tab = .home
+    @Namespace private var tabNamespace
 
     enum Tab: Int, CaseIterable, Identifiable {
         case home, servers, stats
@@ -48,6 +50,9 @@ struct MainShellView: View {
     /// clear below its own bottom-anchored runs.
     private let barReservedHeight: CGFloat = 88
 
+    /// The one motion every page change rides: a soft spring.
+    private let pageMotion = Animation.spring(response: 0.38, dampingFraction: 0.86)
+
     var body: some View {
         ZStack(alignment: .bottom) {
             content
@@ -59,24 +64,38 @@ struct MainShellView: View {
                 .padding(.bottom, 12)
         }
         .ignoresSafeArea(.keyboard, edges: .bottom)
-        .animation(.easeInOut(duration: 0.2), value: page)
     }
 
     @ViewBuilder
     private var content: some View {
-        switch page {
-        case .home:
-            HomeView {
-                openTab(.servers)
+        ZStack {
+            switch page {
+            case .home:
+                HomeView {
+                    openTab(.servers)
+                }
+                .transition(pageTransition)
+            case .servers:
+                ServersView()
+                    .transition(pageTransition)
+            case .stats:
+                StatsView()
+                    .transition(pageTransition)
+            case .settings:
+                SettingsView()
+                    .transition(pageTransition)
             }
-        case .servers: ServersView()
-        case .stats: StatsView()
-        case .settings: SettingsView()
         }
     }
 
+    /// The pages trade places behind a crossfade with a whisper of lift —
+    /// no sliding stacks, the shell itself never moves.
+    private var pageTransition: AnyTransition {
+        .opacity.combined(with: .scale(scale: 0.985))
+    }
+
     private func openTab(_ tab: Tab) {
-        withAnimation(.easeInOut(duration: 0.2)) {
+        withAnimation(pageMotion) {
             page = Page(tab: tab)
             lastTab = tab
         }
@@ -92,7 +111,8 @@ struct MainShellView: View {
     }
 
     /// The tabs' own pill: the active tab wears its icon and label on a
-    /// tonal indicator; the inactive ones keep their icons alone.
+    /// tonal indicator that slides between the slots; the inactive ones
+    /// keep their icons alone.
     private var tabsPill: some View {
         HStack(spacing: 4) {
             ForEach(Tab.allCases) { tab in
@@ -104,6 +124,7 @@ struct MainShellView: View {
         .chumpyGlassCapsule()
         .clipShape(Capsule())
         .chumpyPillEdge()
+        .animation(pageMotion, value: page)
     }
 
     private func tabItem(_ tab: Tab) -> some View {
@@ -123,7 +144,11 @@ struct MainShellView: View {
                     }
                     .padding(.horizontal, 16)
                     .frame(height: 48)
-                    .background(Capsule().fill(Chumpy.secondaryContainer))
+                    .background {
+                        Capsule()
+                            .fill(Chumpy.secondaryContainer)
+                            .matchedGeometryEffect(id: "tab-indicator", in: tabNamespace)
+                    }
                     .foregroundStyle(Color.accentColor)
                 } else {
                     Image(systemName: tab.icon)
@@ -136,27 +161,30 @@ struct MainShellView: View {
         .buttonStyle(.plain)
     }
 
-    /// The round gear button — the settings door. On the settings page it
-    /// wears the same tonal indicator the active tab wears.
+    /// The round gear button — the settings door. It turns a quarter on its
+    /// own hinge as the settings page opens, and wears the same tonal
+    /// indicator the active tab wears.
     private var gearButton: some View {
         let onSettings = page == .settings
 
         return Button {
-            withAnimation(.easeInOut(duration: 0.2)) {
+            withAnimation(pageMotion) {
                 page = onSettings ? Page(tab: lastTab) : .settings
             }
         } label: {
-            Image(systemName: onSettings ? "gearshape.fill" : "gearshape")
+            Image(systemName: "gearshape.fill")
                 .font(.system(size: 20, weight: .medium))
                 .frame(width: 64, height: 64)
                 .background(Circle().fill(onSettings ? Chumpy.secondaryContainer : .clear))
                 .foregroundStyle(onSettings ? Color.accentColor : Color.secondary)
+                .rotationEffect(.degrees(onSettings ? 90 : 0))
         }
         .buttonStyle(.plain)
         .frame(width: 64, height: 64)
         .chumpyGlassCapsule()
         .clipShape(Circle())
         .chumpyPillEdge()
+        .animation(pageMotion, value: page)
     }
 }
 
@@ -166,13 +194,6 @@ extension MainShellView.Page {
         case .home: self = .home
         case .servers: self = .servers
         case .stats: self = .stats
-        }
-    }
-
-    static func == (lhs: MainShellView.Page, rhs: MainShellView.Tab) -> Bool {
-        switch (lhs, rhs) {
-        case (.home, .home), (.servers, .servers), (.stats, .stats): return true
-        default: return false
         }
     }
 }

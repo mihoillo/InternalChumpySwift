@@ -94,3 +94,6 @@
 "servers.updatedAt" = "Обновлена в %@";
 "servers.daysLeft" = "Осталось %d дн.";
 "servers.deleteSubscription" = "Удалить подписку";
+
+"servers.subscriptions" = "Подписки";
+"servers.standalone.subtitle" = "%d конфигов";

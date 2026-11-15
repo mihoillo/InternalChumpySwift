@@ -2,11 +2,10 @@ import SwiftUI
 import NetworkExtension
 import ChumpyCore
 
-/// Home, ported from the Android client's `HomeScreen`: everything floats
-/// just above the connect button, bottom-anchored — "Chumpy" and the big
-/// hour greeting, the info chips flow, the error card, the server card,
-/// and the full-width capsule connect button with the M3 Expressive wavy
-/// progress inside.
+/// Home, ported from the Android client's `HomeScreen` — monolithic, the
+/// way the phone wears it: "Chumpy" and the big hour greeting, the info
+/// chips flow, the error card, the server card, all anchored above the
+/// connect button; no scroll anywhere, the column is one solid block.
 struct HomeView: View {
     @EnvironmentObject private var appState: AppState
     var onOpenServers: () -> Void
@@ -21,60 +20,47 @@ struct HomeView: View {
     private let ticker = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
 
     var body: some View {
-        VStack(spacing: 0) {
-            scrollableColumn
+        VStack(alignment: .leading, spacing: 0) {
+            // The flexible air above: everything below hangs as one solid
+            // block off the bottom of the screen.
+            Spacer(minLength: 12)
+
+            Text("Chumpy")
+                .font(.system(size: 16, weight: .medium))
+                .foregroundStyle(.secondary)
+            Text(greetingText)
+                .font(.system(size: 44, weight: .regular))
+                .foregroundStyle(.primary)
+                .padding(.top, 4)
+
+            Spacer().frame(height: 16)
+            infoChips
+
+            Spacer().frame(height: 12)
+            if let error = appState.lastError {
+                ErrorCard(message: error)
+            }
+            if let profile = appState.store.selectedProfile() {
+                ServerCard(
+                    subscription: subscriptionName(for: profile),
+                    title: profile.remarks.isEmpty ? profile.server : profile.remarks,
+                    flag: leadingFlagEmoji(
+                        profile.remarks.isEmpty ? profile.server : profile.remarks
+                    ),
+                    onClick: onOpenServers
+                )
+            }
+
+            Spacer().frame(height: 16)
             connectButton
-                .padding(.horizontal, 20)
-                .padding(.top, 16)
-                .padding(.bottom, 8)
         }
+        .padding(.horizontal, 20)
         .onReceive(ticker) { now = $0 }
         .onAppear { startLiveDelayIfUp() }
         .onChange(of: appState.status) { _ in startLiveDelayIfUp() }
         .onDisappear {
             liveDelayTask?.cancel()
             liveDelayTask = nil
-        }
-    }
-
-    /// Bottom-anchored: the greeting column floats just above the connect
-    /// button and scrolls up when there is more content than fits.
-    private var scrollableColumn: some View {
-        GeometryReader { geo in
-            ScrollView {
-                VStack(alignment: .leading, spacing: 0) {
-                    Text("Chumpy")
-                        .font(.system(size: 16, weight: .medium))
-                        .foregroundStyle(.secondary)
-                    Text(greetingText)
-                        .font(.system(size: 44, weight: .regular))
-                        .foregroundStyle(.primary)
-                        .padding(.top, 4)
-
-                    Spacer().frame(height: 16)
-                    infoChips
-
-                    Spacer().frame(height: 12)
-                    if let error = appState.lastError {
-                        ErrorCard(message: error)
-                    }
-                    if let profile = appState.store.selectedProfile() {
-                        ServerCard(
-                            subscription: subscriptionName(for: profile),
-                            title: profile.remarks.isEmpty ? profile.server : profile.remarks,
-                            flag: leadingFlagEmoji(
-                                profile.remarks.isEmpty ? profile.server : profile.remarks
-                            ),
-                            onClick: onOpenServers
-                        )
-                    }
-
-                    Spacer().frame(height: 16)
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.horizontal, 20)
-                .frame(minHeight: geo.size.height, alignment: .bottom)
-            }
         }
     }
 
@@ -280,34 +266,19 @@ struct HomeView: View {
 
     // MARK: - Connect button
 
-    /// The full-width 64pt capsule: primary fill when up, the calm tonal
-    /// one when idle — the wavy bar inside carries the whole state.
+    /// The full-width 64pt capsule: the liquid glass bar inside carries
+    /// the whole state — Siri-style color refraction swirling in the glass,
+    /// dim and slow while idle, vivid once the tunnel stands.
     private var connectButton: some View {
         Button {
             Task { await appState.toggle() }
         } label: {
-            WavyConnectBar(
-                fill: connectFill,
-                draining: appState.status == .disconnecting,
-                color: isUp ? Color.white : Chumpy.accent,
-                trackColor: (isUp ? Color.white : Chumpy.accent).opacity(0.30)
-            )
-            .frame(height: 20)
-            .frame(maxWidth: .infinity)
-            .frame(height: 64)
-            .background(
-                Capsule().fill(isUp ? Chumpy.accent : Chumpy.secondaryContainer)
-            )
+            LiquidConnectBar(isUp: isUp)
+                .frame(height: 64)
+                .frame(maxWidth: .infinity)
         }
         .buttonStyle(.plain)
         .disabled(appState.isProcessing)
-    }
-
-    private var connectFill: CGFloat {
-        switch appState.status {
-        case .connected, .reasserting, .connecting: return 1
-        default: return 0
-        }
     }
 }
 
@@ -389,133 +360,91 @@ struct ServerCard: View {
     }
 }
 
-// MARK: - Wavy connect bar
+// MARK: - Liquid connect bar
 
-/// MD3 Expressive-style wavy progress bar, ported from the Android client's
-/// `WavyConnectBar`: rounded caps everywhere, the wave travels continuously
-/// (one wavelength per 1600 ms loop), the bar fills while connecting and
-/// drains while disconnecting, a flat track behind the wave with a small gap.
-struct WavyConnectBar: View {
-    /// 0 when disconnected, 1 when connected — the fill target.
-    let fill: CGFloat
-    /// True while the tunnel is draining — the wave retreats to the right.
-    var draining = false
-    let color: Color
-    let trackColor: Color
+/// The connect button's own glass: Siri-style color refraction — a handful
+/// of glowing color blobs drifting through the capsule on lissajous paths,
+/// composited `plusLighter` over the base so they read as light bending in
+/// liquid glass. Idle the glass stays calm and dim; connected the light
+/// comes up at full strength. The blobs always drift at one constant speed,
+/// so the motion never jumps when the state flips — only the brightness
+/// animates, which SwiftUI does natively.
+struct LiquidConnectBar: View {
+    let isUp: Bool
 
-    /// The in-flight transition: where the fill started and when. Nil at
-    /// rest, so the timeline pauses and the flat track stops drawing frames.
-    @State private var animFrom: CGFloat = 0
-    @State private var animStart: Date?
-    private let fillDuration: TimeInterval = 0.6
-    private var loopSeconds: TimeInterval { 1.6 }
+    private struct Blob {
+        let color: Color
+        let fx: Double
+        let fy: Double
+        let px: Double
+        let py: Double
+        let radius: CGFloat
+    }
+
+    /// The palette the glass refracts: the accent plus its neighbors, with a
+    /// white specular riding along.
+    private let blobs: [Blob] = [
+        Blob(color: Chumpy.accent, fx: 0.90, fy: 1.30, px: 0.0, py: 1.7, radius: 0.90),
+        Blob(color: .purple, fx: 1.10, fy: 0.70, px: 2.1, py: 4.2, radius: 1.00),
+        Blob(color: .pink, fx: 0.60, fy: 1.70, px: 3.9, py: 0.6, radius: 0.80),
+        Blob(color: .teal, fx: 1.40, fy: 0.90, px: 5.0, py: 2.8, radius: 0.85),
+        Blob(color: .blue, fx: 0.80, fy: 1.10, px: 1.2, py: 5.5, radius: 0.95),
+        Blob(color: .white, fx: 1.20, fy: 1.50, px: 4.4, py: 3.3, radius: 0.45),
+    ]
 
     var body: some View {
-        TimelineView(.animation(minimumInterval: 1.0 / 30, paused: isSettled)) { timeline in
-            Canvas { context, size in
-                draw(
-                    in: size,
-                    fill: currentFill(at: timeline.date),
-                    phase: phase(at: timeline.date),
-                    context: context
+        ZStack {
+            Capsule()
+                .fill(baseColor)
+
+            TimelineView(.animation(minimumInterval: 1.0 / 30)) { timeline in
+                Canvas { context, size in
+                    // Light composites as light: the blobs add onto the base
+                    // the way glow adds in glass.
+                    context.blendMode = .plusLighter
+                    let t = timeline.date.timeIntervalSinceReferenceDate * 0.7
+                    for blob in blobs {
+                        let x = size.width * (0.5 + 0.38 * CGFloat(sin(t * blob.fx + blob.px)))
+                        let y = size.height * (0.5 + 0.55 * CGFloat(sin(t * blob.fy + blob.py)))
+                        let r = size.height * blob.radius
+                        let rect = CGRect(x: x - r, y: y - r, width: r * 2, height: r * 2)
+                        context.fill(
+                            Path(ellipseIn: rect),
+                            with: .radialGradient(
+                                Gradient(colors: [blob.color.opacity(0.55), blob.color.opacity(0)]),
+                                center: CGPoint(x: x, y: y),
+                                startRadius: 0,
+                                endRadius: r
+                            )
+                        )
+                    }
+                }
+                .blur(radius: 10)
+            }
+            // Idle the refraction stays a quiet undertone; connected it
+            // comes up to full strength.
+            .opacity(isUp ? 1.0 : 0.35)
+
+            // The glass's own edge: a hairline rim and the specular the
+            // light leaves along the top.
+            Capsule()
+                .strokeBorder(Color.white.opacity(0.22), lineWidth: 1)
+            Capsule()
+                .fill(
+                    LinearGradient(
+                        colors: [.white.opacity(0.16), .clear],
+                        startPoint: .top,
+                        endPoint: .center
+                    )
                 )
-            }
         }
-        .onAppear {
-            animFrom = fill
-            animStart = nil
-        }
-        .onChange(of: fill) { target in
-            animFrom = currentFill(at: Date())
-            animStart = Date()
-        }
-        // The settled flag rides the flight's own end: after the duration
-        // the timeline pauses again (the flat track is a static line).
-        .task(id: fill) {
-            guard animStart != nil else { return }
-            try? await Task.sleep(nanoseconds: UInt64(fillDuration * 1_100_000_000) + 50_000_000)
-            animStart = nil
-        }
+        .clipShape(Capsule())
+        .animation(.easeInOut(duration: 0.7), value: isUp)
     }
 
-    private var isSettled: Bool {
-        fill < 0.001 && animStart == nil
-    }
-
-    private func currentFill(at date: Date) -> CGFloat {
-        guard let start = animStart else { return fill }
-        let t = min(1, date.timeIntervalSince(start) / fillDuration)
-        let eased = 1 - pow(1 - t, 2)
-        return animFrom + (fill - animFrom) * eased
-    }
-
-    private func phase(at date: Date) -> CGFloat {
-        CGFloat(date.timeIntervalSinceReferenceDate.truncatingRemainder(dividingBy: loopSeconds) / loopSeconds)
-    }
-
-    private func draw(in size: CGSize, fill: CGFloat, phase: CGFloat, context: GraphicsContext) {
-        let width = size.width
-        let centerY = size.height / 2
-        let stroke: CGFloat = 6
-        let amplitude: CGFloat = 5
-        let wavelength: CGFloat = 28
-        let gap: CGFloat = 4
-        let phasePx = phase * wavelength
-        let inset = stroke / 2
-        let wavyStroke = StrokeStyle(lineWidth: stroke, lineCap: .round)
-
-        func wavePath(from x0: CGFloat, to x1: CGFloat, amplitude amp: CGFloat) -> Path {
-            var path = Path()
-            var x = x0
-            // Start on the curve, not on the center line — otherwise the
-            // left end bends towards the middle.
-            var y = centerY + amp * CGFloat(sin(2 * .pi * (x + phasePx) / wavelength))
-            path.move(to: CGPoint(x: x, y: y))
-            let step = wavelength / 16
-            while x < x1 {
-                x = min(x + step, x1)
-                y = centerY + amp * CGFloat(sin(2 * .pi * (x + phasePx) / wavelength))
-                path.addLine(to: CGPoint(x: x, y: y))
-            }
-            return path
-        }
-
-        func flatTrack(from x0: CGFloat, to x1: CGFloat) {
-            guard x1 - x0 > inset else { return }
-            var path = Path()
-            path.move(to: CGPoint(x: max(x0, inset), y: centerY))
-            path.addLine(to: CGPoint(x: min(x1, width - inset), y: centerY))
-            context.stroke(path, with: .color(trackColor), style: wavyStroke)
-        }
-
-        if fill >= 0.999 {
-            // All wave, all the way across.
-            context.stroke(
-                wavePath(from: 0, to: width, amplitude: amplitude),
-                with: .color(color),
-                style: wavyStroke
-            )
-        } else if fill <= 0.001 {
-            // Drained: the flat track alone.
-            flatTrack(from: 0, to: width)
-        } else if draining {
-            // The wave retreats to the right and exits at the right edge.
-            let left = width * (1 - fill)
-            flatTrack(from: 0, to: left - gap)
-            context.stroke(
-                wavePath(from: left, to: width, amplitude: amplitude),
-                with: .color(color),
-                style: wavyStroke
-            )
-        } else {
-            // Filling up from the left, the track behind it.
-            let right = width * fill
-            flatTrack(from: right + gap, to: width)
-            context.stroke(
-                wavePath(from: 0, to: right, amplitude: amplitude),
-                with: .color(color),
-                style: wavyStroke
-            )
-        }
+    /// Connected the glass darkens so the light in it carries the state;
+    /// idle it keeps the calm tonal surface.
+    private var baseColor: Color {
+        isUp ? Color.black.opacity(0.45) : Chumpy.surfaceContainer
     }
 }
