@@ -14,6 +14,20 @@ public enum RoutingMode: String, CaseIterable, Codable, Identifiable {
 
     public var id: String { rawValue }
 
+    /// The region code the mode bypasses; nil for global. Used by XrayConfigBuilder.
+    public var region: String? {
+        switch self {
+        case .global: return nil
+        case .ru: return "ru"
+        case .cn: return "cn"
+        case .ir: return "ir"
+        case .af: return "af"
+        case .id: return "id"
+        case .tr: return "tr"
+        case .br: return "br"
+        }
+    }
+
     /// Key used to localize the display name (en: "Global" / "Bypass Russia" …).
     public var localizationKey: String {
         switch self {
