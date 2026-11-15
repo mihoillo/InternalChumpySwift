@@ -100,7 +100,7 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
     private func startStatsPolling() {
         let queue = DispatchQueue(label: "slop.miho.chumpy.swift.tunnel.stats")
         let timer = DispatchSource.makeTimerSource(queue: queue)
-        timer.schedule(repeating: .seconds(1))
+        timer.schedule(deadline: .now(), repeating: .seconds(1))
         timer.setEventHandler { [weak self] in
             guard let self, let bridge = self.bridge else { return }
             let delta = bridge.getAndClearStats()
