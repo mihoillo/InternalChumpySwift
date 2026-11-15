@@ -50,7 +50,7 @@ extension View {
         )
         .overlay(
             ChumpyCardShape(radius: radius)
-                .strokeBorder(Color.primary.opacity(0.05), lineWidth: 0.5)
+                .stroke(Color.primary.opacity(0.05), lineWidth: 0.5)
         )
     }
 
