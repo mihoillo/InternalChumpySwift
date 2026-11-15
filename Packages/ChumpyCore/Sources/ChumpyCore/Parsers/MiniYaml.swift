@@ -267,7 +267,9 @@ enum MiniYaml {
         }
         if text.count >= 2 && text.hasPrefix("\"") && text.hasSuffix("\"") {
             if let data = text.data(using: .utf8),
-               let parsed = try? JSONSerialization.jsonObject(with: data) as? String {
+               let parsed = try? JSONSerialization.jsonObject(
+                   with: data, options: [.fragmentsAllowed]
+               ) as? String {
                 return parsed
             }
             // Not JSON-escaped: keep the inner text verbatim.
