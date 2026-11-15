@@ -46,6 +46,7 @@ jobs:
       - name: Build unsigned IPA (iOS device)
         run: |
           set -o pipefail
+          brew install ldid
           xcodebuild \
             -project ChumpySwift.xcodeproj \
             -scheme Chumpy \
@@ -63,6 +64,18 @@ jobs:
           rm -rf Payload Chumpy-unsigned.ipa
           mkdir Payload
           cp -R "$APP" Payload/
+          # The unsigned build carries no embedded entitlements (Xcode skips
+          # them with signing off) — and without them TrollStore installs an
+          # app the NetworkExtension framework answers with "permission
+          # denied". ldid bakes them into both binaries as a fakesignature;
+          # TrollStore preserves them when it re-signs on device.
+          ldid -SSigning/app.entitlements Payload/Chumpy.app/Chumpy
+          ldid -SSigning/tunnel.entitlements \
+            Payload/Chumpy.app/PlugIns/ChumpyTunnel.appex/ChumpyTunnel
+          echo "--- app entitlements ---"
+          ldid -e Payload/Chumpy.app/Chumpy
+          echo "--- tunnel entitlements ---"
+          ldid -e Payload/Chumpy.app/PlugIns/ChumpyTunnel.appex/ChumpyTunnel
           zip -qry Chumpy-unsigned.ipa Payload
           unzip -l Chumpy-unsigned.ipa | head -5
 
