@@ -1,4 +1,5 @@
 import Foundation
+import CFNetwork
 import Compression
 
 /// Fetches a subscription body with an overall deadline. When the tunnel is

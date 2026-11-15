@@ -29,7 +29,7 @@ extension ProfileStore {
         body: String,
         metadata: SubscriptionMetadata
     ) throws -> Subscription {
-        let parsed = Self.parsedRows(body: body, metadata: metadata)
+        let parsed = try Self.parsedRows(body: body, metadata: metadata)
 
         let id = UUID().uuidString
         let now = Date()
@@ -65,7 +65,7 @@ extension ProfileStore {
         body: String,
         metadata: SubscriptionMetadata
     ) throws -> Subscription {
-        let parsed = Self.parsedRows(body: body, metadata: metadata)
+        let parsed = try Self.parsedRows(body: body, metadata: metadata)
 
         return try queue.sync {
             let subs: [Subscription] = read(subscriptionsFile)
@@ -108,14 +108,10 @@ extension ProfileStore {
     /// Drops a subscription and its profiles wholesale.
     public func deleteSubscription(id: String) {
         queue.sync {
-            write(
-                read(subscriptionsFile).filter { $0.id != id },
-                to: subscriptionsFile
-            )
-            write(
-                read(profilesFile).filter { $0.subscriptionID != id },
-                to: profilesFile
-            )
+            let subs: [Subscription] = read(subscriptionsFile)
+            write(subs.filter { $0.id != id }, to: subscriptionsFile)
+            let profiles: [Profile] = read(profilesFile)
+            write(profiles.filter { $0.subscriptionID != id }, to: profilesFile)
         }
     }
 
