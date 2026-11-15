@@ -149,7 +149,7 @@ public final class ProfileStore {
                 keyed[draft.computeLinkKey()] = draft
             }
             let existing = Set(old.map(\.linkKey))
-            let fresh = keyed.filter { !existing.contains($0.key) }.values
+            let fresh = drafts.filter { !existing.contains($0.computeLinkKey()) }
             var changed = 0
 
             var updated = old.map { row -> Profile in

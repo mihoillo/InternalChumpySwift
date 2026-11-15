@@ -131,12 +131,26 @@ final class ProfileStoreTests: XCTestCase {
     }
 
     func testFallenAwayMembersDegradeToWholeSubscription() {
-        let first = subbed("first.example.com")
+        // The balancer's every member has fallen away from the store — the
+        // pick degrades to the whole subscription, still a pick.
+        let fallen = subbed("fallen.example.com")
         let orphan = subbed("orphan.example.com")
-        let balancer = balancerOver([first], subscriptionID: "sub-1")
+        let balancer = balancerOver([fallen], subscriptionID: "sub-1")
+        store.saveProfiles([orphan, balancer])
+        XCTAssertEqual(
+            ["orphan.example.com"],
+            store.resolvedMembers(for: balancer).map(\.server)
+        )
+    }
+
+    func testPartiallyFallenMembersResolveToOnlyTheSurvivors() {
+        let first = subbed("first.example.com")
+        let fallen = subbed("fallen.example.com")
+        let orphan = subbed("orphan.example.com")
+        let balancer = balancerOver([first, fallen], subscriptionID: "sub-1")
         store.saveProfiles([first, orphan, balancer])
         XCTAssertEqual(
-            ["first.example.com", "orphan.example.com"],
+            ["first.example.com"],
             store.resolvedMembers(for: balancer).map(\.server)
         )
     }
