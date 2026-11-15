@@ -22,7 +22,7 @@ public final class SubscriptionFetcher {
         public let metadata: SubscriptionMetadata
     }
 
-    public enum FetchError: Error, LocalizedError {
+    public enum FetchError: Error, LocalizedError, Equatable {
         case badURL
         case badGeodataURL
         case http(Int)
