@@ -113,7 +113,7 @@ final class ServersViewModel: ObservableObject {
             reload()
             onDone(nil)
         } catch {
-            error = error.localizedDescription
+            self.error = error.localizedDescription
             onDone(error.localizedDescription)
         }
     }
@@ -136,7 +136,7 @@ final class ServersViewModel: ObservableObject {
                 onDone(message)
             }
         } catch {
-            error = error.localizedDescription
+            self.error = error.localizedDescription
             onDone(error.localizedDescription)
         }
     }

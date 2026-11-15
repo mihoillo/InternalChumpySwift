@@ -238,11 +238,11 @@ private struct SubscriptionCard: View {
 
     private var isExpired: Bool {
         subscription.expireEpochSeconds > 0
-            && subscription.expireEpochSeconds < Date().timeIntervalSince1970
+            && Double(subscription.expireEpochSeconds) < Date().timeIntervalSince1970
     }
 
     private var expiryText: String {
-        let secondsLeft = subscription.expireEpochSeconds - Date().timeIntervalSince1970
+        let secondsLeft = Double(subscription.expireEpochSeconds) - Date().timeIntervalSince1970
         if secondsLeft <= 0 {
             return String(localized: "servers.expired", bundle: .main)
         }
