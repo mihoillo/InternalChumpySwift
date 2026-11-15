@@ -209,7 +209,7 @@ private struct ChipTap: ViewModifier {
 // 4dp gaps. On iOS 16+ the Layout protocol walks the row properly; the
 // iOS 15 baseline keeps a plain row (the handful of chips still fits).
 
-struct FlowStack: View {
+struct FlowStack<Content: View>: View {
     var alignment: HorizontalAlignment = .leading
     var spacing: CGFloat = 4
     @ViewBuilder var content: () -> Content
