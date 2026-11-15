@@ -284,15 +284,14 @@ public enum LinkParsers {
 
         // ^(.+?):(.*)@(.+?):(\d+)/?$
         let pattern = #"^(.+?):(.*)@(.+?):(\d+)/?$"#
-        guard let regex = try? NSRegularExpression(pattern: pattern),
-              let match = regex.firstMatch(
-                  in: body, range: NSRange(body.startIndex..., options: []
-              ),
-              match.numberOfRanges == 5,
-              let g3 = Range(match.range(at: 3), in: body),
-              let g4 = Range(match.range(at: 4), in: body),
-              let g2 = Range(match.range(at: 2), in: body),
-              let g1 = Range(match.range(at: 1), in: body)
+        guard let regex = try? NSRegularExpression(pattern: pattern) else { return nil }
+        guard
+            let match = regex.firstMatch(in: body, range: NSRange(body.startIndex..., in: body)),
+            match.numberOfRanges == 5,
+            let g1 = Range(match.range(at: 1), in: body),
+            let g2 = Range(match.range(at: 2), in: body),
+            let g3 = Range(match.range(at: 3), in: body),
+            let g4 = Range(match.range(at: 4), in: body)
         else { return nil }
 
         var profile = Profile(type: .shadowsocks)
