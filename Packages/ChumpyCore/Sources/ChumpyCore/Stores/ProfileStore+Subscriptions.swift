@@ -1,6 +1,6 @@
 import Foundation
 
-/// SubscriptionEntity lifecycle: adding, refreshing and deleting, on top of the
+/// Subscription lifecycle: adding, refreshing and deleting, on top of the
 /// file store. A refresh replaces the subscription's profile rows wholesale,
 /// but profiles whose `linkKey` survives carry their identity — and with it
 /// the selection state and the last measured ping — over to the new rows.
@@ -14,7 +14,7 @@ extension ProfileStore {
 
         public var errorDescription: String? {
             switch self {
-            case .notFound: return "SubscriptionEntity not found"
+            case .notFound: return "Subscription not found"
             case .nothingParsed: return "No server links found in the response"
             }
         }

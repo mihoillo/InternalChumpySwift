@@ -1,7 +1,7 @@
 import XCTest
 @testable import ChumpyCore
 
-/// SubscriptionEntity lifecycle over the file store — the merge semantics ported
+/// Subscription lifecycle over the file store — the merge semantics ported
 /// from the Android client's `SubscriptionRepository`.
 final class SubscriptionStoreTests: XCTestCase {
 

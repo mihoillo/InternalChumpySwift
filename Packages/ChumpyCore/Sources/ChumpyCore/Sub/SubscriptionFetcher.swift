@@ -33,7 +33,7 @@ public final class SubscriptionFetcher {
             case .badURL: return "Not a valid URL"
             case .http(let code): return "HTTP \(code)"
             case .emptyBody: return "Empty subscription body"
-            case .tooLarge: return "SubscriptionEntity body too large"
+            case .tooLarge: return "Subscription body too large"
             }
         }
     }

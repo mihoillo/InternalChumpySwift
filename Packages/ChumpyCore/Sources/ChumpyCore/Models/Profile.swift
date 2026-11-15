@@ -108,7 +108,7 @@ public struct Profile: Codable, Equatable, Identifiable, Hashable {
     /// The user's own hide — stays in the store, out of the list.
     public var concealed: Bool = false
 
-    /// A digest of everything that defines the server. SubscriptionEntity updates
+    /// A digest of everything that defines the server. subscription updates
     /// diff on it: a profile whose linkKey survives keeps identity and state.
     public var linkKey: String = ""
 

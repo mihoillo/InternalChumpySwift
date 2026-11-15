@@ -164,7 +164,7 @@ struct ServersView: View {
     }
 }
 
-// MARK: - SubscriptionEntity card
+// MARK: - Subscription card
 
 private struct SubscriptionCard: View {
     let subscription: SubscriptionEntity
