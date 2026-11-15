@@ -145,9 +145,9 @@ struct HomeView: View {
         let pingSlow = (liveDelay ?? 0) >= 200
         return InfoChip(
             value: pingChipValue,
-            animateValue: true,
             container: pingSlow ? Chumpy.errorContainer : Chumpy.surfaceContainerLow,
             content: pingSlow ? Color.red : Color.primary,
+            animateValue: true,
             action: {
                 guard !measuringPing else { return }
                 measuringPing = true
@@ -229,7 +229,7 @@ struct HomeView: View {
               (0x1F1E6...0x1F1FF).contains(scalars[0].value),
               (0x1F1E6...0x1F1FF).contains(scalars[1].value)
         else { return nil }
-        return String(scalars)
+        return "\(scalars[0])\(scalars[1])"
     }
 
     // MARK: - Live delay

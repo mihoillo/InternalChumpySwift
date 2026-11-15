@@ -579,7 +579,7 @@ private struct ServerGroupRow: View {
               (0x1F1E6...0x1F1FF).contains(scalars[0].value),
               (0x1F1E6...0x1F1FF).contains(scalars[1].value)
         else { return nil }
-        return String(scalars)
+        return "\(scalars[0])\(scalars[1])"
     }
 
     /// "· N ms" or the offline tail — only once the row has ever answered a
