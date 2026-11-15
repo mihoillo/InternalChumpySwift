@@ -64,11 +64,12 @@ public enum ConnectionStore {
     @discardableResult
     public static func update(
         defaults: UserDefaults = ChumpyConstant.sharedDefaults,
-        _ transform: (ConnectionSettings) -> ConnectionSettings
+        _ transform: (inout ConnectionSettings) -> Void
     ) -> ConnectionSettings {
-        let updated = transform(current(defaults: defaults))
-        update(updated, defaults: defaults)
-        return updated
+        var settings = current(defaults: defaults)
+        transform(&settings)
+        update(settings, defaults: defaults)
+        return settings
     }
 
     private struct SettingsSnapshot: Codable {

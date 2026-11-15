@@ -97,7 +97,7 @@ public final class ProfileStore {
     public func selectProfile(id: String) {
         ConnectionStore.update(defaults: defaults) { $0.selectedProfileID = id }
         queue.sync {
-            var profiles = read(profilesFile)
+            var profiles: [Profile] = read(profilesFile)
             guard let index = profiles.firstIndex(where: { $0.id == id }) else { return }
             profiles[index].lastUsedAt = Date()
             write(profiles, to: profilesFile)
@@ -142,7 +142,7 @@ public final class ProfileStore {
         guard !drafts.isEmpty else { throw StoreError.nothingRecognizable }
 
         return try queue.sync {
-            let all = read(profilesFile)
+            let all: [Profile] = read(profilesFile)
             let old = all.filter { $0.subscriptionID == nil }
             var keyed: [String: Profile] = [:]
             for draft in drafts {
@@ -212,7 +212,7 @@ public final class ProfileStore {
     /// stays (hidden) — the column still names its linkKey.
     public func deleteManualProfile(id: String) {
         queue.sync {
-            let all = read(profilesFile)
+            let all: [Profile] = read(profilesFile)
             let old = all.filter { $0.subscriptionID == nil }
             let remaining = old.filter { $0.id != id }
             let referenced = Set(
@@ -234,8 +234,8 @@ public final class ProfileStore {
     /// Drops every standalone profile at once — the group's own delete.
     public func deleteManualProfiles() {
         queue.sync {
-            let old = read(profilesFile)
-            write(old.filter { $0.subscriptionID != nil }, to: profilesFile)
+            let all: [Profile] = read(profilesFile)
+            write(all.filter { $0.subscriptionID != nil }, to: profilesFile)
         }
     }
 
