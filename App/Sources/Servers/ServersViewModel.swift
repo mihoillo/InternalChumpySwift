@@ -14,6 +14,8 @@ final class ServersViewModel: ObservableObject {
     @Published private(set) var selectedSubscriptionID: String?
     @Published private(set) var selectedProfileID: String?
     @Published private(set) var updatingSubscriptionID: String?
+    /// Whether a real-ping sweep over the list is running.
+    @Published private(set) var isPinging = false
     /// How many standalone configs wait outside any subscription.
     @Published private(set) var manualProfileCount = 0
     @Published var error: String?
@@ -26,6 +28,9 @@ final class ServersViewModel: ObservableObject {
     private lazy var fetcher = SubscriptionFetcher(
         tunnelUp: { [weak self] in self?.tunnelUp() ?? false }
     )
+
+    /// The running sweep's generation; a stale one stops mid-flight.
+    private var pingGeneration = 0
 
     /// The standalone group's synthetic card.
     var selectedSubscription: SubscriptionEntity? {
@@ -111,6 +116,7 @@ final class ServersViewModel: ObservableObject {
             // The group the servers landed in becomes the shown one.
             ConnectionStore.update { $0.selectedSubscriptionID = sub.id }
             reload()
+            SubscriptionAutoUpdate.schedule()
             onDone(nil)
         } catch {
             self.error = error.localizedDescription
@@ -154,12 +160,21 @@ final class ServersViewModel: ObservableObject {
             let fetched = try await fetcher.fetchWithNestedExpansion(sub.url)
             try store.updateSubscription(id: id, body: fetched.body, metadata: fetched.metadata)
             reload()
+            SubscriptionAutoUpdate.schedule()
         } catch {
             store.markSubscriptionUpdateFailed(id: id, message: error.localizedDescription)
             reload()
             // After the reload — it clears the banner; the card keeps the message.
             self.error = error.localizedDescription
         }
+    }
+
+    /// The per-subscription auto-update toggle; the background schedule
+    /// re-arms itself with the new set of due dates.
+    func setSubscriptionAutoUpdate(id: String, enabled: Bool) {
+        store.setSubscriptionAutoUpdate(id: id, enabled: enabled)
+        reload()
+        SubscriptionAutoUpdate.schedule()
     }
 
     /// Deletes a subscription and everything it brought in — or the
@@ -188,5 +203,69 @@ final class ServersViewModel: ObservableObject {
             ConnectionStore.update { $0.selectedProfileID = nil }
         }
         reload()
+    }
+
+    // MARK: - Real pings
+
+    /// A real-ping sweep over the current list, one measurement core per
+    /// profile, a handful at a time. Pull-to-refresh on the servers screen is
+    /// this; every profile's chip answers with its own number — or clears,
+    /// when the server is unreachable. Ported from the Android client's
+    /// `MainViewModel.startServerSweep`.
+    func pingServers() async {
+        if isPinging { return }
+        let targets = profiles.filter { $0.type != .balancer }
+        guard !targets.isEmpty else { return }
+
+        pingGeneration += 1
+        let generation = pingGeneration
+        isPinging = true
+        defer {
+            if generation == pingGeneration { isPinging = false }
+        }
+
+        // A handful of measurement cores at a time, the next queued profile
+        // filling each finishing worker's slot — the Android sweep's own
+        // pool, four workers instead of ten (the cores share this process).
+        let testURL = ConnectionStore.current().testURL
+        var batch: [(id: String, delay: Int64?)] = []
+
+        await withTaskGroup(of: (Profile, Int64?).self) { group in
+            var iterator = targets.makeIterator()
+            let workerCount = min((targets.count - 1) / 10 + 1, 4)
+            for _ in 0..<workerCount {
+                guard let next = iterator.next() else { break }
+                group.addTask { (next, DelayTester.measure(profile: next, testURL: testURL)) }
+            }
+            for await (profile, delay) in group {
+                guard generation == pingGeneration, !Task.isCancelled else {
+                    group.cancelAll()
+                    return
+                }
+                batch.append((profile.id, delay))
+                if batch.count >= 5 {
+                    store.setProfileDelays(batch, testedAt: Date())
+                    batch.removeAll()
+                    reloadPreservingSweepState()
+                }
+                if let next = iterator.next() {
+                    group.addTask { (next, DelayTester.measure(profile: next, testURL: testURL)) }
+                }
+            }
+        }
+        if !batch.isEmpty, generation == pingGeneration {
+            store.setProfileDelays(batch, testedAt: Date())
+        }
+        if generation == pingGeneration {
+            reloadPreservingSweepState()
+        }
+    }
+
+    /// The sweep's own refresh — `reload` clears the banner and re-reads the
+    /// list; the pinging flag and the generation stand.
+    private func reloadPreservingSweepState() {
+        let wasPinging = isPinging
+        reload()
+        isPinging = wasPinging
     }
 }

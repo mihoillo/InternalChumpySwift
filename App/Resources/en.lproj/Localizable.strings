@@ -33,11 +33,15 @@
 "servers.add.namePlaceholder" = "Optional";
 "servers.add.nameFooter" = "Falls back to the name the panel sends, then the host.";
 "servers.add.import" = "Import";
+"servers.autoUpdate" = "Auto-update";
 "common.cancel" = "Cancel";
 "common.add" = "Add";
 
 "stats.overview" = "Overview";
 "stats.trafficTotal" = "Traffic this session";
+"stats.week" = "This week";
+"stats.week.empty" = "No traffic recorded yet.";
+"stats.week.total" = "Week total %@ · ↓ %@ · ↑ %@";
 "stats.coreLog" = "Core log";
 "stats.empty" = "No log entries yet. Connect to see the core log.";
 

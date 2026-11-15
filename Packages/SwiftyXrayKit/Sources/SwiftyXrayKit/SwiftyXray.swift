@@ -91,6 +91,42 @@ public class SwiftyXray {
       throw SwiftyXRayError.invalidResponse(base64JsonResponse)
     }
   }
+
+  /// libXray's sentinel for a failed delay measurement (`nodep.PingDelayError`).
+  public static let pingDelayError: Int64 = 10_000
+
+  /// libXray's sentinel for a timed-out delay measurement
+  /// (`nodep.PingDelayTimeout`).
+  public static let pingDelayTimeout: Int64 = 11_000
+
+  /// Runs a throwaway Xray instance from `configPath` and measures an HTTP
+  /// round trip to `url` through `proxy` — typically the loopback SOCKS
+  /// inbound the config itself listens on, so the fetch actually traverses
+  /// the outbound under test. The role Android's
+  /// `Libv2ray.measureOutboundDelay` plays.
+  ///
+  /// - Returns: The measured delay in milliseconds. The sentinels above
+  ///   (`pingDelayError`, `pingDelayTimeout`) arrive in `data` alongside a
+  ///   failure; the caller maps them.
+  /// - Throws: SwiftyXRayError carrying the wrapper's own error message.
+  public static func ping(
+    datDir: String,
+    configPath: String,
+    timeout: Int,
+    url: String,
+    proxy: String
+  ) throws -> Int64 {
+    let body = XrayPingRequestBody(
+      datDir: datDir, configPath: configPath, timeout: timeout, url: url, proxy: proxy
+    )
+    let encoded = try JSONEncoder().encode(body)
+    let base64JsonResponse = LibXrayPing(encoded.base64EncodedString())
+    let response = try XrayPingResponse(base64String: base64JsonResponse)
+    guard response.success else {
+      throw SwiftyXRayError.invalidResponse(response.error ?? "ping failed")
+    }
+    return response.data ?? pingDelayError
+  }
   
   /// Gets the current Xray version
   /// - Returns: Version string

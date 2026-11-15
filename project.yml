@@ -30,6 +30,7 @@ targets:
       - path: App/Resources
     dependencies:
       - package: ChumpyCore
+      - package: SwiftyXrayKit
       - target: ChumpyTunnel
     settings:
       base:
@@ -48,6 +49,8 @@ targets:
           - UIInterfaceOrientationLandscapeRight
         UIApplicationSceneManifest:
           UIApplicationSupportsMultipleScenes: false
+        BGTaskSchedulerPermittedIdentifiers:
+          - slop.miho.chumpy.swift.subscription-refresh
     entitlements:
       path: App/Chumpy.entitlements
       properties:

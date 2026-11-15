@@ -174,6 +174,38 @@ public enum XrayConfigBuilder {
         return JSONX.toJSONString(config) ?? "{}"
     }
 
+    /// The delay-measurement document with the loopback SOCKS inbound the
+    /// measuring fetch rides through: libXray's `Ping` runs this config as a
+    /// throwaway instance and does the HTTP round trip via `proxy` — the
+    /// only way the request actually traverses the outbound under test (the
+    /// dance Android's `measureOutboundDelay` performs inside its own
+    /// wrapper). Deviation from the Kotlin builder, which has no such
+    /// variant: the Android wrapper adds the inbound itself, iOS's does not.
+    public static func buildPing(_ profile: Profile, socksPort: Int) -> String {
+        let base = buildTest(profile)
+        guard let data = base.data(using: .utf8),
+              var config = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any]
+        else { return base }
+        config["inbounds"] = [[
+            "tag": socksTag,
+            "listen": "127.0.0.1",
+            "port": socksPort,
+            "protocol": "socks",
+            "settings": [
+                "auth": "noauth",
+                "udp": false,
+                "ip": "127.0.0.1",
+            ],
+        ] as [String: Any]]
+        return JSONX.toJSONString(config) ?? base
+    }
+
+    /// The proxy URL a delay measurement of a `buildPing` document fetches
+    /// through.
+    public static func pingProxyURL(port: Int) -> String {
+        "socks5://127.0.0.1:\(port)"
+    }
+
     private static func sniffing() -> [String: Any] {
         [
             "enabled": true,

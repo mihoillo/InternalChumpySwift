@@ -79,6 +79,39 @@ public final class ProfileStore {
         queue.sync { read(subscriptionsFile).first { $0.id == id } }
     }
 
+    /// The per-subscription auto-update toggle — the schedule's own switch.
+    public func setSubscriptionAutoUpdate(id: String, enabled: Bool) {
+        queue.sync {
+            var subscriptions: [SubscriptionEntity] = read(subscriptionsFile)
+            guard let index = subscriptions.firstIndex(where: { $0.id == id })
+            else { return }
+            subscriptions[index].autoUpdate = enabled
+            write(subscriptions, to: subscriptionsFile)
+        }
+    }
+
+    /// Stores measured pings on profile rows, for the list's chips — a
+    /// targeted update, the rows' identities untouched. A nil delay marks
+    /// "tested, unreachable". Ported from the Android client's
+    /// `profiles.setDelay` batch path.
+    public func setProfileDelays(
+        _ results: [(id: String, delay: Int64?)], testedAt: Date
+    ) {
+        guard !results.isEmpty else { return }
+        queue.sync {
+            var profiles: [Profile] = read(profilesFile)
+            let delays = Dictionary(
+                results.map { ($0.id, $0.delay) }, uniquingKeysWith: { first, _ in first }
+            )
+            for index in profiles.indices {
+                guard let delay = delays[profiles[index].id] else { continue }
+                profiles[index].testDelayMillis = delay
+                profiles[index].lastTestAt = testedAt
+            }
+            write(profiles, to: profilesFile)
+        }
+    }
+
     // MARK: - Selection
 
     /// The profile a connect uses: the selection when it still resolves, the

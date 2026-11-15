@@ -68,10 +68,19 @@ struct ServersView: View {
                         }
                 }
             } header: {
-                Text("servers.group.title")
+                HStack {
+                    Text("servers.group.title")
+                    if model.isPinging {
+                        Spacer()
+                        ProgressView()
+                    }
+                }
             }
         }
         .listStyle(.insetGrouped)
+        .refreshable {
+            await model.pingServers()
+        }
     }
 
     private func isSelected(_ profile: Profile) -> Bool {
@@ -129,8 +138,32 @@ struct ServersView: View {
                     name: sub.name.isEmpty ? sub.url : sub.name
                 )
             }
+            autoUpdateToggle
         } label: {
             Image(systemName: "rectangle.stack")
+        }
+    }
+
+    /// The per-subscription auto-update switch, inside the dropdown — the
+    /// Android client's own arrangement.
+    @ViewBuilder
+    private var autoUpdateToggle: some View {
+        if let id = model.selectedSubscriptionID, !model.isStandaloneSelected,
+           let sub = model.subscriptions.first(where: { $0.id == id }) {
+            Divider()
+            Button {
+                model.setSubscriptionAutoUpdate(id: id, enabled: !sub.autoUpdate)
+            } label: {
+                if sub.autoUpdate {
+                    Label {
+                        Text("servers.autoUpdate")
+                    } icon: {
+                        Image(systemName: "checkmark")
+                    }
+                } else {
+                    Text("servers.autoUpdate")
+                }
+            }
         }
     }
 

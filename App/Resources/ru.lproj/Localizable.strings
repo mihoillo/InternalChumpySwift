@@ -33,11 +33,15 @@
 "servers.add.namePlaceholder" = "Необязательно";
 "servers.add.nameFooter" = "По умолчанию — имя от панели, затем хост.";
 "servers.add.import" = "Импортировать";
+"servers.autoUpdate" = "Автообновление";
 "common.cancel" = "Отмена";
 "common.add" = "Добавить";
 
 "stats.overview" = "Обзор";
 "stats.trafficTotal" = "Трафик за сессию";
+"stats.week" = "За неделю";
+"stats.week.empty" = "Трафика пока не было.";
+"stats.week.total" = "Всего за неделю %@ · ↓ %@ · ↑ %@";
 "stats.coreLog" = "Лог ядра";
 "stats.empty" = "Записей пока нет. Подключитесь, чтобы увидеть лог ядра.";
 

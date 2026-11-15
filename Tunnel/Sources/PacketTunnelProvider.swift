@@ -11,6 +11,11 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
 
     private var bridge: XrayBridge?
     private var statsTimer: DispatchSourceTimer?
+    /// The minute's deltas accumulated before the daily bucket write.
+    private var pendingRx: Int64 = 0
+    private var pendingTx: Int64 = 0
+    private var statsTicks = 0
+    private let dailyTraffic = DailyTrafficStore()
     private let logger = Logger(subsystem: "slop.miho.chumpy.swift.tunnel", category: "core")
 
     private enum TunnelError: LocalizedError {
@@ -111,6 +116,15 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
                 forKey: ChumpyConstant.Keys.statsBytesTotal
             )
             defaults.set(Date().timeIntervalSince1970, forKey: ChumpyConstant.Keys.statsUpdatedAt)
+
+            // The week's buckets: a write a minute at most — the deltas
+            // accumulate in memory and flush as the session runs.
+            self.pendingRx += delta.received
+            self.pendingTx += delta.sent
+            self.statsTicks += 1
+            if self.statsTicks >= 60 {
+                self.flushDailyTraffic()
+            }
         }
         timer.resume()
         statsTimer = timer
@@ -119,6 +133,20 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
     private func stopStatsPolling() {
         statsTimer?.cancel()
         statsTimer = nil
+        flushDailyTraffic()
+    }
+
+    /// Folds the minute's deltas into today's bucket — the stats screen's
+    /// weekly chart survives restarts and disconnected days.
+    private func flushDailyTraffic() {
+        guard pendingRx > 0 || pendingTx > 0 else {
+            statsTicks = 0
+            return
+        }
+        dailyTraffic.addToday(rx: pendingRx, tx: pendingTx)
+        pendingRx = 0
+        pendingTx = 0
+        statsTicks = 0
     }
 
     // MARK: - Network settings
