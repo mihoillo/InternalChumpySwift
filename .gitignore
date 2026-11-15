@@ -1,0 +1,25 @@
+# Xcode / xcodegen
+*.xcodeproj
+!*.xcodeproj/project.yml
+DerivedData/
+build/
+xcuserdata/
+*.xcuserstate
+
+# SPM
+.build/
+Package.resolved
+**/Package.resolved
+
+# xcodegen generates these from project.yml at CI time
+App/Info.plist
+Tunnel/Info.plist
+App/Chumpy.entitlements
+Tunnel/ChumpyTunnel.entitlements
+
+# macOS
+.DS_Store
+
+# misc
+*.ipa
+*.dSYM.zip

@@ -1,0 +1,44 @@
+"tab.home" = "Главная";
+"tab.servers" = "Серверы";
+"tab.stats" = "Статистика";
+"tab.settings" = "Настройки";
+
+"home.selectedProfile" = "Выбранный профиль";
+"home.noProfile" = "Профиль не выбран";
+"home.connect" = "Подключить";
+"home.disconnect" = "Отключить";
+"home.status.connected" = "Подключено";
+"home.status.connecting" = "Подключение…";
+"home.status.disconnecting" = "Отключение…";
+"home.status.reasserting" = "Переподключение…";
+"home.status.invalid" = "Не настроено";
+"home.status.disconnected" = "Отключено";
+"home.uptime" = "Время";
+"home.traffic" = "Трафик";
+
+"servers.empty.title" = "Пока нет серверов";
+"servers.empty.subtitle" = "Добавление подписок и ссылок появится в следующей сборке.";
+
+"stats.overview" = "Обзор";
+"stats.trafficTotal" = "Трафик за сессию";
+"stats.coreLog" = "Лог ядра";
+"stats.empty" = "Записей пока нет. Подключитесь, чтобы увидеть лог ядра.";
+
+"settings.connection" = "Подключение";
+"settings.routing" = "Маршрутизация";
+"settings.testURL" = "URL теста задержки";
+"settings.tunnel" = "Туннель";
+"settings.status" = "Статус";
+"settings.reinstallProfile" = "Удалить VPN-профиль";
+"settings.about" = "О приложении";
+"settings.appVersion" = "Версия приложения";
+"settings.coreVersion" = "Ядро Xray";
+
+"routing.global" = "Глобально";
+"routing.ru" = "Обход России";
+"routing.cn" = "Обход Китая";
+"routing.ir" = "Обход Ирана";
+"routing.af" = "Обход Афганистана";
+"routing.id" = "Обход Индонезии";
+"routing.tr" = "Обход Турции";
+"routing.br" = "Обход Бразилии";

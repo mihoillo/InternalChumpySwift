@@ -1,0 +1,101 @@
+name: ChumpySwift
+options:
+  bundleIdPrefix: slop.miho
+  deploymentTarget:
+    iOS: "15.0"
+  createIntermediateGroups: true
+
+settings:
+  base:
+    SWIFT_VERSION: "5.9"
+    CODE_SIGN_STYLE: Automatic
+    CURRENT_PROJECT_VERSION: 1
+    MARKETING_VERSION: "0.1.0"
+    ENABLE_USER_SCRIPT_SANDBOXING: NO
+    ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+    ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
+
+packages:
+  ChumpyCore:
+    path: Packages/ChumpyCore
+  SwiftyXrayKit:
+    path: Packages/SwiftyXrayKit
+
+targets:
+  Chumpy:
+    type: application
+    platform: iOS
+    sources:
+      - path: App/Sources
+      - path: App/Resources
+    dependencies:
+      - package: ChumpyCore
+      - target: ChumpyTunnel
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: slop.miho.chumpy.swift
+        GENERATE_INFOPLIST_FILE: NO
+    info:
+      path: App/Info.plist
+      properties:
+        CFBundleDisplayName: Chumpy
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        UILaunchScreen: {}
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
+        UIApplicationSceneManifest:
+          UIApplicationSupportsMultipleScenes: false
+    entitlements:
+      path: App/Chumpy.entitlements
+      properties:
+        com.apple.security.application-groups:
+          - group.slop.miho.chumpy.swift
+
+  ChumpyTunnel:
+    type: app-extension
+    platform: iOS
+    sources:
+      - path: Tunnel/Sources
+    dependencies:
+      - package: ChumpyCore
+      - package: SwiftyXrayKit
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: slop.miho.chumpy.swift.tunnel
+        GENERATE_INFOPLIST_FILE: NO
+    info:
+      path: Tunnel/Info.plist
+      properties:
+        CFBundleDisplayName: ChumpyTunnel
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.networkextension.packet-tunnel
+          NSExtensionPrincipalClass: $(PRODUCT_MODULE_NAME).PacketTunnelProvider
+    entitlements:
+      path: Tunnel/ChumpyTunnel.entitlements
+      properties:
+        com.apple.security.application-groups:
+          - group.slop.miho.chumpy.swift
+        com.apple.developer.networking.networkextension:
+          - packet-tunnel-provider
+
+schemes:
+  Chumpy:
+    build:
+      targets:
+        Chumpy: all
+    run:
+      config: Debug
+    test:
+      config: Debug
+      gatherCoverageData: false
+  ChumpyTunnel:
+    build:
+      targets:
+        ChumpyTunnel: all
+    run:
+      config: Debug

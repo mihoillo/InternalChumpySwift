@@ -1,0 +1,44 @@
+"tab.home" = "Home";
+"tab.servers" = "Servers";
+"tab.stats" = "Stats";
+"tab.settings" = "Settings";
+
+"home.selectedProfile" = "Selected profile";
+"home.noProfile" = "No profile selected";
+"home.connect" = "Connect";
+"home.disconnect" = "Disconnect";
+"home.status.connected" = "Connected";
+"home.status.connecting" = "Connecting…";
+"home.status.disconnecting" = "Disconnecting…";
+"home.status.reasserting" = "Reconnecting…";
+"home.status.invalid" = "Not configured";
+"home.status.disconnected" = "Disconnected";
+"home.uptime" = "Uptime";
+"home.traffic" = "Traffic";
+
+"servers.empty.title" = "No servers yet";
+"servers.empty.subtitle" = "Add a subscription or paste a share link — coming in the next build.";
+
+"stats.overview" = "Overview";
+"stats.trafficTotal" = "Traffic this session";
+"stats.coreLog" = "Core log";
+"stats.empty" = "No log entries yet. Connect to see the core log.";
+
+"settings.connection" = "Connection";
+"settings.routing" = "Routing";
+"settings.testURL" = "Delay test URL";
+"settings.tunnel" = "Tunnel";
+"settings.status" = "Status";
+"settings.reinstallProfile" = "Remove VPN profile";
+"settings.about" = "About";
+"settings.appVersion" = "App version";
+"settings.coreVersion" = "Xray core";
+
+"routing.global" = "Global";
+"routing.ru" = "Bypass Russia";
+"routing.cn" = "Bypass China";
+"routing.ir" = "Bypass Iran";
+"routing.af" = "Bypass Afghanistan";
+"routing.id" = "Bypass Indonesia";
+"routing.tr" = "Bypass Turkey";
+"routing.br" = "Bypass Brazil";
