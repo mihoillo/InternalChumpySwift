@@ -1,5 +1,4 @@
 import Foundation
-import CFNetwork
 import Compression
 
 /// Fetches a subscription body with an overall deadline. When the tunnel is
@@ -157,11 +156,13 @@ public final class SubscriptionFetcher {
         config.timeoutIntervalForRequest = 30
         config.timeoutIntervalForResource = 45
         if tunnelUp {
-            // Through the running core's loopback SOCKS inbound.
+            // Through the running core's loopback SOCKS inbound. The keys are
+            // the kCFStreamPropertySOCKSProxy* / kCFNetworkProxies* constants'
+            // own raw values — spelled out to keep clear of their availability.
             config.connectionProxyDictionary = [
-                kCFNetworkProxiesSOCKSEnable as String: 1,
-                kCFStreamPropertySOCKSProxyHostName as String: "127.0.0.1",
-                kCFStreamPropertySOCKSProxyPort as String: XrayConfigBuilder.localSocksPort,
+                "kCFNetworkProxiesSOCKSEnable": 1,
+                "kCFStreamPropertySOCKSProxyHost": "127.0.0.1",
+                "kCFStreamPropertySOCKSProxyPort": XrayConfigBuilder.localSocksPort,
             ]
         }
         return config
