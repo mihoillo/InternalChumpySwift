@@ -457,7 +457,8 @@ public enum ConfigParser {
                 guard let raw = JSONX.str(rule, key)?
                     .trimmingCharacters(in: .whitespaces)
                 else { return }
-                guard let value = transform?(raw) ?? raw, !value.isEmpty else { return }
+                let value = transform?(raw) ?? raw
+                guard !value.isEmpty else { return }
                 matchers[into] = value
             }
             scalar("port", into: "port")
