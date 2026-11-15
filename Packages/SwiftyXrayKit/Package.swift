@@ -26,6 +26,11 @@ let package = Package(
         name: "SwiftyXrayKit",
         dependencies: ["LibXray"],
         path: "Sources/SwiftyXrayKit",
+        // Swift 5 language mode: the kit's thread code predates Swift 6
+        // strict-concurrency requirements (@Sendable Thread closures).
+        swiftSettings: [
+          .swiftLanguageMode(.v5)
+        ],
         linkerSettings: [
           .linkedLibrary("resolv")
         ]
