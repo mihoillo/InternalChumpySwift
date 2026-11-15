@@ -69,9 +69,9 @@ final class DailyTrafficStoreTests: XCTestCase {
         }
         let week = store.readWeek(now: now)
         XCTAssertEqual(7, week.count)
-        // The eight-day-old bucket (rx = 8) never landed; today (rx = 1)
-        // is the freshest.
-        XCTAssertEqual([1, 2, 3, 4, 5, 6, 7], week.map(\.rx))
+        // The eight-day-old bucket (rx = 8) never landed; the list is
+        // oldest first, so today (rx = 1) is the last.
+        XCTAssertEqual([7, 6, 5, 4, 3, 2, 1], week.map(\.rx))
     }
 
     func testAddDayRejectsOlderThanAWeek() {

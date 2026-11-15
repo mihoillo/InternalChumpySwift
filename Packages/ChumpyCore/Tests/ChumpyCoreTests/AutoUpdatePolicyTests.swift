@@ -98,9 +98,10 @@ final class AutoUpdatePolicyTests: XCTestCase {
             intervalHours: 24,
             lastSuccess: now.addingTimeInterval(-5 * 3600)
         )
-        let expected = first.lastUpdateSuccess!.addingTimeInterval(24 * 3600)
+        // The soonest due date here lies in the past — the scheduler lead
+        // is what stands between it and "as soon as the system allows".
         XCTAssertEqual(
-            expected,
+            now.addingTimeInterval(AutoUpdatePolicy.schedulerLeadSeconds),
             AutoUpdatePolicy.nextRefreshDate([first, second], now: now)
         )
     }

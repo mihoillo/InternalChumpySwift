@@ -110,7 +110,11 @@ final class ProfileDelayTests: XCTestCase {
 
         let row = try XCTUnwrap(store.profiles().first)
         XCTAssertNil(row.testDelayMillis)
-        XCTAssertEqual(testedAt, row.lastTestAt)
+        // The store serializes to iso8601 — second precision.
+        XCTAssertEqual(
+            Int(testedAt.timeIntervalSince1970),
+            row.lastTestAt.map { Int($0.timeIntervalSince1970) }
+        )
     }
 
     func testEmptyResultsWriteNothing() throws {
