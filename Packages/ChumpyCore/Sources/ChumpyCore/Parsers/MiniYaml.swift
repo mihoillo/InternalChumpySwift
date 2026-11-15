@@ -171,7 +171,7 @@ enum MiniYaml {
 
     /// `key: value` — the first colon outside quotes that ends the key.
     private static func keyValue(_ text: String) -> (String, String)? {
-        guard let index = delimiter(text, ":") else { return nil }
+        guard let index = try? delimiter(text, ":") else { return nil }
         let rest = String(text[text.index(after: index)...])
         if !rest.isEmpty && !rest[rest.startIndex].isWhitespace { return nil }
         return (unquote(String(text[..<index]).trimmingCharacters(in: .whitespaces)),
@@ -189,7 +189,7 @@ enum MiniYaml {
             let inner = String(text.dropFirst().dropLast())
             var map: [String: Any?] = [:]
             for entry in try splitFlow(inner) {
-                guard let colon = delimiter(entry, ":") else { throw YamlError.invalidMapping }
+                guard let colon = try delimiter(entry, ":") else { throw YamlError.invalidMapping }
                 let key = unquote(String(entry[..<colon]).trimmingCharacters(in: .whitespaces))
                 map[key] = try scalar(String(entry[entry.index(after: colon)...])
                     .trimmingCharacters(in: .whitespaces))
@@ -209,7 +209,7 @@ enum MiniYaml {
         return result
     }
 
-    private static func delimiter(_ text: String, _ target: Character) -> String.Index? {
+    private static func delimiter(_ text: String, _ target: Character) throws -> String.Index? {
         try delimiters(text, target).first
     }
 
