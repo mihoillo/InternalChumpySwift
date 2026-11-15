@@ -14,11 +14,6 @@ public enum SubscriptionParser {
         if let configs = ConfigParser.parse(text) {
             return distinctByLinkKey(configs)
         }
-        // Clash YAML next — panels serve it to Clash-flavoured clients.
-        // TODO(M1-next): port ClashYamlParser from the Android client.
-        if let clash = ClashYamlParser.parse(text) {
-            return distinctByLinkKey(clash)
-        }
         let profiles = text
             .split(separator: "\n", omittingEmptySubsequences: true)
             .compactMap { LinkParsers.parse(String($0)) }
@@ -66,12 +61,5 @@ public enum SubscriptionParser {
             }
         }
         return result
-    }
-}
-
-/// Placeholder until the Clash YAML dialect is ported (next M1 batch).
-public enum ClashYamlParser {
-    static func parse(_ text: String) -> [Profile]? {
-        nil
     }
 }
