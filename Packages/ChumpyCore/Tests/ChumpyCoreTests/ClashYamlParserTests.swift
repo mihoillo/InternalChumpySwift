@@ -277,4 +277,134 @@ final class ClashYamlParserTests: XCTestCase {
         XCTAssertEqual("1000-2000", rules[0]["port"] as? String)
         XCTAssertEqual("block", rules[0]["outboundTag"] as? String)
     }
+
+    // MARK: - Panel body end-to-end (ClashPanelBodyTest)
+
+    private func panelBody() -> String {
+        """
+        proxies:
+        - name: '🇩🇪  Тестия #1'
+          type: vless
+          server: 1.2.3.4
+          port: 443
+          uuid: 00000000-1111-2222-3333-444444444444
+          network: tcp
+          udp: true
+          tls: true
+          servername: de4.example.org
+          client-fingerprint: edge
+          reality-opts:
+            public-key: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+            short-id: '0000000000000000'
+          flow: xtls-rprx-vision
+        - name: '🇩🇪  Тестия #1 (копия)'
+          type: vless
+          server: 1.2.3.4
+          port: 443
+          uuid: 00000000-1111-2222-3333-444444444444
+          network: tcp
+          udp: true
+          tls: true
+          servername: de4.example.org
+          client-fingerprint: edge
+          reality-opts:
+            public-key: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+            short-id: '0000000000000000'
+          flow: xtls-rprx-vision
+        - name: '🇬🇧  Тестланд #2'
+          type: vless
+          server: 1.2.3.5
+          port: 443
+          uuid: 00000000-1111-2222-3333-444444444444
+          network: grpc
+          udp: true
+          tls: true
+          servername: gb4.example.org
+          client-fingerprint: chrome
+          grpc-opts:
+            grpc-service-name: vlgrpc
+          alpn:
+          - h2
+        - name: '🇫🇮  Тестия #3'
+          type: vless
+          server: 1.2.3.6
+          port: 443
+          uuid: 00000000-1111-2222-3333-444444444444
+          network: ws
+          udp: true
+          ws-opts:
+            path: /api-test
+        - name: '🇳🇱  Тест #4'
+          type: trojan
+          server: 1.2.3.7
+          port: 443
+          password: fake-trojan-password
+          udp: true
+          sni: nl4.example.org
+          alpn:
+          - h2
+          network: grpc
+          tls: true
+          client-fingerprint: chrome
+          grpc-opts:
+            grpc-service-name: ajv
+        proxy-groups:
+        - name: PROXY
+          type: select
+          proxies:
+          - auto
+          - DIRECT
+          - '🇩🇪  Тестия #1'
+        - name: auto
+          type: url-test
+          proxies:
+          - '🇩🇪  Тестия #1'
+          - '🇬🇧  Тестланд #2'
+          url: http://www.gstatic.com/generate_204
+          interval: 300
+        rules:
+        - DOMAIN-SUFFIX,example.com,DIRECT
+        - RULE-SET,category-ru,DIRECT
+        - MATCH,PROXY
+        """
+    }
+
+    func testPanelBodyParsesEveryShapeItServes() {
+        guard let profiles = ClashYamlParser.parse(panelBody()) else {
+            return XCTFail("nil")
+        }
+        // Five entries in the body; the duplicate endpoint collapses.
+        XCTAssertEqual(4, profiles.count)
+        XCTAssertTrue(profiles.allSatisfy { $0.type == .vless || $0.type == .trojan })
+        XCTAssertEqual(3, profiles.filter { $0.type == .vless }.count)
+        // The body's one trojan entry, next to the vless fleet.
+        let trojan = profiles.filter { $0.type == .trojan }.first
+        XCTAssertEqual("🇳🇱  Тест #4", trojan?.remarks)
+        XCTAssertEqual("fake-trojan-password", trojan?.password)
+        XCTAssertEqual("grpc", trojan?.network)
+        XCTAssertEqual("ajv", trojan?.serviceName)
+        XCTAssertEqual("h2", trojan?.alpn)
+        XCTAssertEqual("nl4.example.org", trojan?.sni)
+        XCTAssertTrue(profiles.allSatisfy { !$0.server.isEmpty && $0.serverPort > 0 })
+        XCTAssertTrue(
+            profiles.filter { $0.type == .vless }
+                .allSatisfy { $0.password == "00000000-1111-2222-3333-444444444444" }
+        )
+
+        // The three transports the panel serves, all present.
+        XCTAssertTrue(profiles.contains { $0.network == "tcp" && $0.security == "reality" })
+        XCTAssertTrue(profiles.contains {
+            $0.network == "grpc" && $0.alpn == "h2" && !$0.serviceName.isEmpty
+        })
+        XCTAssertTrue(profiles.contains { $0.network == "ws" && !$0.path.isEmpty })
+
+        // Spot-check the first reality entry, field by field.
+        let first = profiles.first { $0.network == "tcp" && $0.security == "reality" }
+        XCTAssertEqual("reality", first?.security)
+        XCTAssertEqual(443, first?.serverPort)
+        XCTAssertEqual("edge", first?.fingerprint)
+        XCTAssertFalse(first?.publicKey.isEmpty ?? true)
+        XCTAssertFalse(first?.shortID.isEmpty ?? true)
+        XCTAssertEqual("xtls-rprx-vision", first?.flow)
+    }
 }
