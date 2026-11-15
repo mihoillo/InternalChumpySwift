@@ -7,6 +7,8 @@ import XCTest
 /// `GeodataFiles.prepare` semantics.
 final class GeodataFilesTests: XCTestCase {
 
+    typealias FetchError = SubscriptionFetcher.FetchError
+
     private var directory: URL!
     private var files: GeodataFiles!
     private var now: Date!
@@ -87,7 +89,7 @@ final class GeodataFilesTests: XCTestCase {
         ) as! [String: Any]
         let routing = root["routing"] as! [String: Any]
         let rules = routing["rules"] as! [[String: Any]]
-        return JSONX.strings(rules[0]["domain"])
+        return JSONX.strings(rules[0]["domain"] as? [Any])
     }
 
     private func ipValues(of json: String) -> [String] {
@@ -96,7 +98,7 @@ final class GeodataFilesTests: XCTestCase {
         ) as! [String: Any]
         let routing = root["routing"] as! [String: Any]
         let rules = routing["rules"] as! [[String: Any]]
-        return JSONX.strings(rules[0]["ip"])
+        return JSONX.strings(rules[0]["ip"] as? [Any])
     }
 
     private func canonical(_ json: String) -> String {
@@ -144,7 +146,7 @@ final class GeodataFilesTests: XCTestCase {
     }
 
     private func providerFiles() -> [String] {
-        (try! FileManager.default.contentsOfDirectory(at: directory))
+        (try! FileManager.default.contentsOfDirectory(atPath: directory.path))
             .filter { $0.hasPrefix("provider-") && $0.hasSuffix(".dat") }
             .sorted()
     }
