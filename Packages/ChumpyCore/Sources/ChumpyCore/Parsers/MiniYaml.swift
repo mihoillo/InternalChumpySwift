@@ -60,8 +60,11 @@ enum MiniYaml {
             let char = text[index]
             if let q = quote {
                 if q == "\"" && char == "\\" {
-                    index = text.index(index, offsetBy: 2)
-                    if index > text.endIndex { return text }
+                    guard let after = text.index(index, offsetBy: 2, limitedBy: text.endIndex) else {
+                        // Escape at line end: the quote never closes; keep the line.
+                        return text
+                    }
+                    index = after
                     continue
                 }
                 if char == q {
@@ -204,6 +207,7 @@ enum MiniYaml {
         var start = text.startIndex
         for index in try delimiters(text, ",") + [text.endIndex] {
             result.append(String(text[start..<index]))
+            guard index < text.endIndex else { break }
             start = text.index(after: index)
         }
         return result
@@ -222,8 +226,10 @@ enum MiniYaml {
             let char = text[index]
             if let q = quote {
                 if q == "\"" && char == "\\" {
+                    guard text.index(index, offsetBy: 2, limitedBy: text.endIndex) != nil else {
+                        throw YamlError.unterminatedValue
+                    }
                     index = text.index(index, offsetBy: 2)
-                    if index > text.endIndex { throw YamlError.unterminatedValue }
                     continue
                 }
                 if char == q {
