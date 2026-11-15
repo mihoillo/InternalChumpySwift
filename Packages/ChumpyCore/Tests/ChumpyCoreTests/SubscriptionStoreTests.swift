@@ -79,10 +79,10 @@ final class SubscriptionStoreTests: XCTestCase {
 
     func testAddSubscriptionMergesHeaderGeodataSources() throws {
         var metadata = SubscriptionMetadata()
-        metadata.geodataSources = "geosite=custom.dat"
+        metadata.geodataSources = #"{"geosite.dat": "https://cdn.example.com/geosite.dat"}"#
         let sub = try store.addSubscription(url: "https://x.example.com", body: linkOne, metadata: metadata)
         XCTAssertEqual(
-            "geosite=custom.dat",
+            metadata.geodataSources,
             store.profiles(ofSubscription: sub.id).first?.geodataSources
         )
     }
