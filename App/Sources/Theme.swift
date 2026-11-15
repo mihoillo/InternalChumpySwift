@@ -136,7 +136,7 @@ struct InfoChip: View {
     /// the chip itself appearing.
     var animateValue = false
     var action: (() -> Void)?
-    @ViewBuilder var leading: AnyView? = nil
+    var leading: AnyView? = nil
 
     var body: some View {
         chipContent()
