@@ -91,6 +91,17 @@ final class AppState: ObservableObject {
 
     // MARK: - Connect / disconnect
 
+    /// Selects a server: persists the choice and, if the tunnel is up,
+    /// reloads the running core with the new profile in place — the interface
+    /// stays, the session does not drop. Ported from the Android client's
+    /// `MainViewModel.selectProfile`.
+    func selectProfile(id: String) async {
+        store.selectProfile(id: id)
+        if status == .connected || status == .connecting || status == .reasserting {
+            await connect()
+        }
+    }
+
     func toggle() async {
         switch status {
         case .connected, .connecting, .reasserting:

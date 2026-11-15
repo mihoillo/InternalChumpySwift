@@ -9,9 +9,9 @@ import Foundation
 /// rewrite the whole file (the store is small — a subscription's worth of rows).
 public final class ProfileStore {
 
-    private let directory: URL
-    private let defaults: UserDefaults
-    private let queue = DispatchQueue(label: "slop.miho.chumpy.swift.profilestore")
+    let directory: URL
+    let defaults: UserDefaults
+    let queue = DispatchQueue(label: "slop.miho.chumpy.swift.profilestore")
 
     public enum StoreError: Error, LocalizedError {
         case nothingRecognizable
@@ -37,8 +37,8 @@ public final class ProfileStore {
 
     // MARK: - Profiles
 
-    private var profilesFile: URL { directory.appendingPathComponent("profiles.json") }
-    private var subscriptionsFile: URL { directory.appendingPathComponent("subscriptions.json") }
+    var profilesFile: URL { directory.appendingPathComponent("profiles.json") }
+    var subscriptionsFile: URL { directory.appendingPathComponent("subscriptions.json") }
 
     /// Every stored profile, in store order.
     public func profiles() -> [Profile] {
@@ -241,14 +241,14 @@ public final class ProfileStore {
 
     // MARK: - Storage
 
-    private func read<T: Decodable>(_ file: URL) -> [T] {
+    func read<T: Decodable>(_ file: URL) -> [T] {
         guard let data = try? Data(contentsOf: file) else { return [] }
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .iso8601
         return (try? decoder.decode([T].self, from: data)) ?? []
     }
 
-    private func write<T: Encodable>(_ rows: [T], to file: URL) {
+    func write<T: Encodable>(_ rows: [T], to file: URL) {
         let encoder = JSONEncoder()
         encoder.dateEncodingStrategy = .iso8601
         guard let data = try? encoder.encode(rows) else { return }

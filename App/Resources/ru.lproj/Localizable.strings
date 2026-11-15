@@ -17,7 +17,24 @@
 "home.traffic" = "Трафик";
 
 "servers.empty.title" = "Пока нет серверов";
-"servers.empty.subtitle" = "Добавление подписок и ссылок появится в следующей сборке.";
+"servers.empty.subtitle" = "Добавьте подписку или вставьте ссылку.";
+"servers.standalone" = "Вручную";
+"servers.group.title" = "Серверы";
+"servers.delete" = "Удалить";
+"servers.updated" = "Обновлено %@";
+"servers.expiresInDays" = "Истекает через %d дн.";
+"servers.expired" = "Истекла";
+"servers.import.nothingNew" = "Нечего импортировать";
+"servers.add.subscription" = "Добавить подписку";
+"servers.add.paste" = "Вставить ссылки";
+"servers.add.url" = "URL";
+"servers.add.urlPlaceholder" = "panel.example.com/sub";
+"servers.add.name" = "Название";
+"servers.add.namePlaceholder" = "Необязательно";
+"servers.add.nameFooter" = "По умолчанию — имя от панели, затем хост.";
+"servers.add.import" = "Импортировать";
+"common.cancel" = "Отмена";
+"common.add" = "Добавить";
 
 "stats.overview" = "Обзор";
 "stats.trafficTotal" = "Трафик за сессию";

@@ -17,7 +17,24 @@
 "home.traffic" = "Traffic";
 
 "servers.empty.title" = "No servers yet";
-"servers.empty.subtitle" = "Add a subscription or paste a share link — coming in the next build.";
+"servers.empty.subtitle" = "Add a subscription or paste a share link.";
+"servers.standalone" = "Standalone";
+"servers.group.title" = "Servers";
+"servers.delete" = "Delete";
+"servers.updated" = "Updated %@";
+"servers.expiresInDays" = "Expires in %d days";
+"servers.expired" = "Expired";
+"servers.import.nothingNew" = "Nothing new to import";
+"servers.add.subscription" = "Add subscription";
+"servers.add.paste" = "Paste links";
+"servers.add.url" = "URL";
+"servers.add.urlPlaceholder" = "panel.example.com/sub";
+"servers.add.name" = "Name";
+"servers.add.namePlaceholder" = "Optional";
+"servers.add.nameFooter" = "Falls back to the name the panel sends, then the host.";
+"servers.add.import" = "Import";
+"common.cancel" = "Cancel";
+"common.add" = "Add";
 
 "stats.overview" = "Overview";
 "stats.trafficTotal" = "Traffic this session";

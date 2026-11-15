@@ -52,8 +52,10 @@ struct HomeView: View {
     }
 
     private var currentProfileName: String {
-        ChumpyConstant.sharedDefaults.string(forKey: ChumpyConstant.Keys.tunnelProfileName)
-            ?? String(localized: "home.noProfile")
+        if let profile = appState.store.selectedProfile() {
+            return profile.remarks.isEmpty ? profile.server : profile.remarks
+        }
+        return String(localized: "home.noProfile", bundle: .main)
     }
 
     // MARK: - Connect button
