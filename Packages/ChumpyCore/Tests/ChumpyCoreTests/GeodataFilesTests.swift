@@ -26,6 +26,9 @@ final class GeodataFilesTests: XCTestCase {
         super.setUp()
         directory = FileManager.default.temporaryDirectory
             .appendingPathComponent("geodata-\(UUID().uuidString)", isDirectory: true)
+        try? FileManager.default.createDirectory(
+            at: directory, withIntermediateDirectories: true
+        )
         files = GeodataFiles()
         now = calendar.date(
             from: DateComponents(year: 2026, month: 11, day: 16, hour: 12)
@@ -128,6 +131,12 @@ final class GeodataFilesTests: XCTestCase {
 
     // MARK: - Prepare
 
+    /// The reference a config carries once the builder's rewrite has named
+    /// a source: the URL's own hashed file, with the category behind it.
+    private func extRef(_ url: String, _ category: String) -> String {
+        "ext:\(GeodataSources.filenameFor(url)):\(category)"
+    }
+
     private func prepare(
         _ config: String,
         sources: String = "{}",
@@ -163,12 +172,13 @@ final class GeodataFilesTests: XCTestCase {
     // MARK: - Download and rewrite
 
     func testDownloadRewritesGeositeReferences() async throws {
-        served["https://panel.example/geosite.dat"] = container(["RU", "CN"])
+        let url = "https://panel.example/geosite.dat"
+        served[url] = container(["RU", "CN"])
         let config = self.config(
-            rules: rule(domain: ["geosite:RU", "geosite:!CN@attr", "domain:example.com"])
+            rules: rule(domain: [extRef(url, "RU"), extRef(url, "!CN@attr"), "domain:example.com"])
         )
         let prepared = try await prepare(
-            config, sources: sources(["geosite.dat": "https://panel.example/geosite.dat"])
+            config, sources: sources(["geosite.dat": url])
         )
 
         let values = domainValues(of: prepared)
@@ -196,7 +206,7 @@ final class GeodataFilesTests: XCTestCase {
         let stored = rewritten[1]
         XCTAssertTrue(providerFiles().contains(stored))
         let pointer = directory.appendingPathComponent(
-            "\(GeodataSources.filenameFor("https://panel.example/geosite.dat")).cache"
+            "\(GeodataSources.filenameFor(url)).cache"
         )
         XCTAssertEqual(
             stored,
@@ -206,23 +216,30 @@ final class GeodataFilesTests: XCTestCase {
         )
     }
 
-    func testGeoipReferencesAreRewrittenToo() async throws {
-        served["https://panel.example/geoip.dat"] = container(["CN", "RU"])
-        let config = self.config(rules: rule(domain: ["domain:example.com"], ip: ["geoip:CN"]))
-        let prepared = try await prepare(
-            config, sources: sources(["geoip.dat": "https://panel.example/geoip.dat"])
+    func testGeoipReferencesAreRewrittenToo() {
+        // The prepare-time rewrite covers `geoip:` exactly like `geosite:`
+        // — a documented deviation from the Kotlin original, whose
+        // `geoip:` branch could never fire (the URL map is hashed).
+        let root: [String: Any] = [
+            "routing": ["rules": [["type": "field", "ip": ["geoip:CN", "geoip:RU"]]]],
+        ]
+        let prepared = GeodataFiles.rewritten(
+            root, replacements: ["geoip.dat": "provider-stored.dat"]
         )
-        let values = ipValues(of: prepared)
-        XCTAssertEqual(1, values.count)
-        XCTAssertTrue(values[0].hasPrefix("ext:provider-"))
-        XCTAssertTrue(values[0].hasSuffix(":CN"))
+        let routing = prepared["routing"] as! [String: Any]
+        let rules = routing["rules"] as! [[String: Any]]
+        XCTAssertEqual(
+            ["ext:provider-stored.dat:CN", "ext:provider-stored.dat:RU"],
+            JSONX.strings(rules[0]["ip"] as? [Any])
+        )
     }
 
     func testExtReferencesAreRewritten() async throws {
-        served["https://panel.example/custom.dat"] = container(["RU"])
-        let config = self.config(rules: rule(domain: ["ext:custom.dat:RU"]))
+        let url = "https://panel.example/custom.dat"
+        served[url] = container(["RU"])
+        let config = self.config(rules: rule(domain: [extRef(url, "RU")]))
         let prepared = try await prepare(
-            config, sources: sources(["custom.dat": "https://panel.example/custom.dat"])
+            config, sources: sources(["custom.dat": url])
         )
         let value = domainValues(of: prepared)[0]
         XCTAssertTrue(value.hasPrefix("ext:provider-"))
@@ -274,11 +291,12 @@ final class GeodataFilesTests: XCTestCase {
     }
 
     func testCategoriesMissingThrows() async throws {
-        served["https://panel.example/geosite.dat"] = container(["CN"])
-        let config = self.config(rules: rule(domain: ["geosite:RU"]))
+        let url = "https://panel.example/geosite.dat"
+        served[url] = container(["CN"])
+        let config = self.config(rules: rule(domain: [extRef(url, "RU")]))
         do {
             _ = try await prepare(
-                config, sources: sources(["geosite.dat": "https://panel.example/geosite.dat"])
+                config, sources: sources(["geosite.dat": url])
             )
             XCTFail("a database without the wanted category must throw")
         } catch let error as GeodataFiles.PrepareError {
@@ -304,12 +322,13 @@ final class GeodataFilesTests: XCTestCase {
     // MARK: - The cache
 
     func testFreshCacheSkipsTheDownload() async throws {
-        served["https://panel.example/geosite.dat"] = container(["RU"])
-        let config = self.config(rules: rule(domain: ["geosite:RU"]))
-        let url = sources(["geosite.dat": "https://panel.example/geosite.dat"])
-        let first = try await prepare(config, sources: url)
+        let url = "https://panel.example/geosite.dat"
+        served[url] = container(["RU"])
+        let config = self.config(rules: rule(domain: [extRef(url, "RU")]))
+        let sources = self.sources(["geosite.dat": url])
+        let first = try await prepare(config, sources: sources)
         XCTAssertEqual(1, fetched.count)
-        let second = try await prepare(config, sources: url)
+        let second = try await prepare(config, sources: sources)
         XCTAssertEqual(1, fetched.count, "the fresh cache must serve the second prepare")
         XCTAssertEqual(
             domainValues(of: first)[0], domainValues(of: second)[0]
@@ -317,10 +336,11 @@ final class GeodataFilesTests: XCTestCase {
     }
 
     func testStaleCacheBeatsAFailedDownload() async throws {
-        served["https://panel.example/geosite.dat"] = container(["RU"])
-        let config = self.config(rules: rule(domain: ["geosite:RU"]))
-        let url = sources(["geosite.dat": "https://panel.example/geosite.dat"])
-        let first = try await prepare(config, sources: url)
+        let url = "https://panel.example/geosite.dat"
+        served[url] = container(["RU"])
+        let config = self.config(rules: rule(domain: [extRef(url, "RU")]))
+        let sources = self.sources(["geosite.dat": url])
+        let first = try await prepare(config, sources: sources)
 
         // The cached provider file ages past the cache lifetime.
         let stored = providerFiles()
@@ -332,7 +352,7 @@ final class GeodataFilesTests: XCTestCase {
         )
 
         fetchError = "offline"
-        let second = try await prepare(config, sources: url)
+        let second = try await prepare(config, sources: sources)
         XCTAssertEqual(
             domainValues(of: first)[0], domainValues(of: second)[0],
             "the stale cache must serve when the download fails"
@@ -340,16 +360,19 @@ final class GeodataFilesTests: XCTestCase {
     }
 
     func testCacheNotCoveringTheWantedCategoryIsRedownloaded() async throws {
-        served["https://panel.example/geosite.dat"] = container(["RU"])
-        let config = self.config(rules: rule(domain: ["geosite:RU"]))
-        let url = sources(["geosite.dat": "https://panel.example/geosite.dat"])
-        _ = try await prepare(config, sources: url)
+        let url = "https://panel.example/geosite.dat"
+        served[url] = container(["RU"])
+        let config = self.config(rules: rule(domain: [extRef(url, "RU")]))
+        let sources = self.sources(["geosite.dat": url])
+        _ = try await prepare(config, sources: sources)
 
         // The panel now ships the missing category too; the fresh but
         // non-covering cache must give way.
-        served["https://panel.example/geosite.dat"] = container(["RU", "CN"])
-        let extended = self.config(rules: rule(domain: ["geosite:RU", "geosite:CN"]))
-        let prepared = try await prepare(extended, sources: url)
+        served[url] = container(["RU", "CN"])
+        let extended = self.config(
+            rules: rule(domain: [extRef(url, "RU"), extRef(url, "CN")])
+        )
+        let prepared = try await prepare(extended, sources: sources)
         XCTAssertEqual(2, fetched.count)
 
         // Both references aim at the new content-addressed file, with their
@@ -405,11 +428,11 @@ final class GeodataFilesTests: XCTestCase {
     }
 
     func testProviderFilesReferencedByTheNewConfigSurvive() async throws {
-        served["https://panel.example/geosite.dat"] = container(["RU"])
-        let config = self.config(rules: rule(domain: ["geosite:RU"]))
-        _ = try await prepare(
-            config, sources: sources(["geosite.dat": "https://panel.example/geosite.dat"])
-        )
+        let url = "https://panel.example/geosite.dat"
+        served[url] = container(["RU"])
+        let config = self.config(rules: rule(domain: [extRef(url, "RU")]))
+        let sources = self.sources(["geosite.dat": url])
+        _ = try await prepare(config, sources: sources)
         let stored = providerFiles()
         XCTAssertEqual(1, stored.count)
 
@@ -420,9 +443,7 @@ final class GeodataFilesTests: XCTestCase {
             [.modificationDate: now.addingTimeInterval(-8 * 86_400)],
             ofItemAtPath: directory.appendingPathComponent(stored[0]).path
         )
-        _ = try await prepare(
-            config, sources: sources(["geosite.dat": "https://panel.example/geosite.dat"])
-        )
+        _ = try await prepare(config, sources: sources)
         // The stale file forced a re-download — served from the network
         // again and stored under the same content address.
         XCTAssertEqual(Set([stored[0]]), Set(providerFiles()))

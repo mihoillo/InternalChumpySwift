@@ -152,8 +152,8 @@ final class GeodataCategoriesTests: XCTestCase {
         var entry = Data()
         entry.append(contentsOf: [0x12, 0x03] + Array("zzz".utf8))           // field 2
         entry.append(contentsOf: [0x18, 0x2A])                                // field 3
-        entry.append(contentsOf: [0x20] + [UInt8](repeating: 0, count: 8))    // field 4
-        entry.append(contentsOf: [0x2D] + [UInt8](repeating: 0, count: 4))    // field 5
+        entry.append(contentsOf: [0x21] + [UInt8](repeating: 0, count: 8))    // field 4, fixed64
+        entry.append(contentsOf: [0x2D] + [UInt8](repeating: 0, count: 4))    // field 5, fixed32
         entry.append(contentsOf: [0x0A, 0x02, 0x52, 0x55])                    // field 1
         var data = Data([0x0A])
         data.append(contentsOf: varint(entry.count))
