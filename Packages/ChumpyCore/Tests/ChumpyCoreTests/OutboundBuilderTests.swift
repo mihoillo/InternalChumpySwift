@@ -100,7 +100,7 @@ final class OutboundBuilderTests: XCTestCase {
         let peers = (settings?["peers"] as? [Any])?.first as? [String: Any]
         XCTAssertEqual("PUBKEY=", peers?["publicKey"] as? String)
         XCTAssertEqual("PSK=", peers?["preSharedKey"] as? String)
-        XCTAssertEqual("[5.6.7.8]:51820", peers?["endpoint"] as? String)
+        XCTAssertEqual("5.6.7.8:51820", peers?["endpoint"] as? String)
         XCTAssertEqual(1420, (settings?["mtu"] as? NSNumber)?.intValue)
         XCTAssertEqual(
             [1, 2, 3],
