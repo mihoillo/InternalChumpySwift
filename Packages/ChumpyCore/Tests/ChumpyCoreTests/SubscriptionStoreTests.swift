@@ -82,8 +82,10 @@ final class SubscriptionStoreTests: XCTestCase {
         metadata.geodataSources = #"{"geosite.dat": "https://cdn.example.com/geosite.dat"}"#
         let sub = try store.addSubscription(url: "https://x.example.com", body: linkOne, metadata: metadata)
         XCTAssertEqual(
-            metadata.geodataSources,
-            store.profiles(ofSubscription: sub.id).first?.geodataSources
+            ["geosite.dat": "https://cdn.example.com/geosite.dat"],
+            GeodataSources.parseSafely(
+                store.profiles(ofSubscription: sub.id).first?.geodataSources ?? ""
+            )
         )
     }
 
