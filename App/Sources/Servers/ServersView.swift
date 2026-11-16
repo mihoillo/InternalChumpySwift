@@ -406,8 +406,8 @@ private struct ServerGroupRow: View {
 
     var body: some View {
         ZStack(alignment: .topTrailing) {
-            rowFill
-                .overlay(rowContent)
+            rowContent
+                .background(rowFill)
                 .contextMenu { menu }
             if profile.pinned {
                 // The pin at the row's top-right corner, rotated the way the
@@ -424,6 +424,8 @@ private struct ServerGroupRow: View {
         .animation(.easeInOut(duration: 0.18), value: isSelected)
     }
 
+    /// The row's own paint, riding behind the content as its background —
+    /// it sizes to the row, not to some collapsed proposal.
     private var rowFill: some View {
         UnevenCornerShape(
             topLeft: isFirst ? Chumpy.cardRadius : Chumpy.innerRadius,
