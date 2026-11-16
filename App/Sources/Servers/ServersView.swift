@@ -540,17 +540,26 @@ private struct ServerGroupRow: View {
     }
 
     /// The row's own paint, riding behind the content as its background —
-    /// the group's outer 28pt / inner 4pt corner law. The standing row
-    /// wears the tint; the rest wear the native frost.
+    /// the group's outer 28pt / inner 4pt corner law. The native frost
+    /// lies beneath always; the selected tint fades over it — never a
+    /// swap between paints, for the swap animates between styles that
+    /// don't blend and renders black.
     private var rowFill: some View {
+        ZStack {
+            rowShape.fill(.regularMaterial)
+            rowShape.fill(Chumpy.primaryContainer)
+                .opacity(isSelected ? 1 : 0)
+        }
+        .animation(.easeInOut(duration: 0.18), value: isSelected)
+    }
+
+    private var rowShape: UnevenCornerShape {
         UnevenCornerShape(
             topLeft: isFirst ? Chumpy.cardRadius : Chumpy.innerRadius,
             topRight: isFirst ? Chumpy.cardRadius : Chumpy.innerRadius,
             bottomLeft: isLast ? Chumpy.cardRadius : Chumpy.innerRadius,
             bottomRight: isLast ? Chumpy.cardRadius : Chumpy.innerRadius
         )
-        .fill(isSelected ? AnyShapeStyle(Chumpy.primaryContainer) : AnyShapeStyle(.regularMaterial))
-        .animation(.easeInOut(duration: 0.18), value: isSelected)
     }
 
     private var rowContent: some View {
@@ -766,14 +775,12 @@ private struct SubscriptionChooserSheet: View {
         }
     }
 
-    /// One thick group row: 64pt minimum, the tile, the name over the host,
-    /// the standing one painted tonal with its checkmark. A tap stands it;
-    /// a long-press asks the delete — the same context menu the server
-    /// rows wear, on the row's own shape.
-    private func row(id: String, name: String, subtitle: String) -> some View {
-        let isSelected = model.selectedSubscriptionID == id
-
-        return HStack(spacing: 16) {
+    /// The row's face: the tile, the name over the host, the checkmark on
+    /// the standing one — on the frosted card with the tint fading over
+    /// it when it stands. Both the row and its context-menu preview wear
+    /// it, so the menu's lifted shape is the row's own.
+    private func rowFace(name: String, subtitle: String, isSelected: Bool) -> some View {
+        HStack(spacing: 16) {
             ZStack {
                 RoundedRectangle(cornerRadius: 12, style: .continuous)
                     .fill(isSelected ? Chumpy.accent : Chumpy.secondaryContainer)
@@ -803,21 +810,55 @@ private struct SubscriptionChooserSheet: View {
         .padding(16)
         .frame(minHeight: 72)
         .background(
-            RoundedRectangle(cornerRadius: 20, style: .continuous)
-                .fill(isSelected ? AnyShapeStyle(Chumpy.primaryContainer) : AnyShapeStyle(.regularMaterial))
-        )
-        .contentShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
-        .onTapGesture {
-            model.selectSubscription(id)
-            dismiss()
-        }
-        .contextMenu {
-            Button(role: .destructive) {
-                model.deleteSubscription(id)
-                dismiss()
-            } label: {
-                Label("servers.deleteSubscription", systemImage: "trash")
+            ZStack {
+                RoundedRectangle(cornerRadius: 20, style: .continuous)
+                    .fill(.regularMaterial)
+                RoundedRectangle(cornerRadius: 20, style: .continuous)
+                    .fill(Chumpy.primaryContainer)
+                    .opacity(isSelected ? 1 : 0)
             }
+        )
+    }
+
+    /// One thick group row: a tap stands it, a long-press asks the
+    /// delete. The menu's own preview is the row's face — the lifted
+    /// shape matches the object, not the system's square plate.
+    @ViewBuilder
+    private func row(id: String, name: String, subtitle: String) -> some View {
+        let isSelected = model.selectedSubscriptionID == id
+        let face = rowFace(name: name, subtitle: subtitle, isSelected: isSelected)
+        if #available(iOS 16.0, *) {
+            face
+                .contentShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+                .onTapGesture {
+                    model.selectSubscription(id)
+                    dismiss()
+                }
+                .contextMenu {
+                    deleteMenu(id)
+                } preview: {
+                    face
+                }
+        } else {
+            face
+                .contentShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+                .onTapGesture {
+                    model.selectSubscription(id)
+                    dismiss()
+                }
+                .contextMenu {
+                    deleteMenu(id)
+                }
+        }
+    }
+
+    /// The group's own delete — the context menu's one ask.
+    private func deleteMenu(_ id: String) -> some View {
+        Button(role: .destructive) {
+            model.deleteSubscription(id)
+            dismiss()
+        } label: {
+            Label("servers.deleteSubscription", systemImage: "trash")
         }
     }
 
@@ -850,7 +891,7 @@ private struct SubscriptionChooserSheet: View {
             .frame(minHeight: 72)
             .background(
                 RoundedRectangle(cornerRadius: 20, style: .continuous)
-                    .fill(AnyShapeStyle(.regularMaterial))
+                    .fill(.regularMaterial)
             )
         }
         .buttonStyle(.plain)
