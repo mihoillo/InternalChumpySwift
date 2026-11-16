@@ -540,7 +540,8 @@ private struct ServerGroupRow: View {
     }
 
     /// The row's own paint, riding behind the content as its background —
-    /// the group's outer 28pt / inner 4pt corner law.
+    /// the group's outer 28pt / inner 4pt corner law. The standing row
+    /// wears the tint; the rest wear the native frost.
     private var rowFill: some View {
         UnevenCornerShape(
             topLeft: isFirst ? Chumpy.cardRadius : Chumpy.innerRadius,
@@ -548,7 +549,7 @@ private struct ServerGroupRow: View {
             bottomLeft: isLast ? Chumpy.cardRadius : Chumpy.innerRadius,
             bottomRight: isLast ? Chumpy.cardRadius : Chumpy.innerRadius
         )
-        .fill(isSelected ? Chumpy.primaryContainer : Chumpy.surfaceContainer)
+        .fill(isSelected ? AnyShapeStyle(Chumpy.primaryContainer) : AnyShapeStyle(.regularMaterial))
         .animation(.easeInOut(duration: 0.18), value: isSelected)
     }
 
@@ -766,50 +767,50 @@ private struct SubscriptionChooserSheet: View {
     }
 
     /// One thick group row: 64pt minimum, the tile, the name over the host,
-    /// the standing one painted tonal with its checkmark — and a
-    /// long-press asking the group's delete.
+    /// the standing one painted tonal with its checkmark. A tap stands it;
+    /// a long-press asks the delete — the same context menu the server
+    /// rows wear, on the row's own shape.
     private func row(id: String, name: String, subtitle: String) -> some View {
         let isSelected = model.selectedSubscriptionID == id
 
-        return Button {
+        return HStack(spacing: 16) {
+            ZStack {
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .fill(isSelected ? Chumpy.accent : Chumpy.secondaryContainer)
+                    .frame(width: 40, height: 40)
+                Image(systemName: "externaldrive.fill")
+                    .font(.system(size: 17, weight: .medium))
+                    .foregroundStyle(isSelected ? Color.white : Color.accentColor)
+            }
+            VStack(alignment: .leading, spacing: 2) {
+                Text(name)
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(.primary)
+                    .lineLimit(1)
+                Text(subtitle)
+                    .font(.system(size: 12))
+                    .foregroundStyle(Color.secondary)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+            }
+            Spacer(minLength: 8)
+            if isSelected {
+                Image(systemName: "checkmark")
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(Color.accentColor)
+            }
+        }
+        .padding(16)
+        .frame(minHeight: 72)
+        .background(
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .fill(isSelected ? AnyShapeStyle(Chumpy.primaryContainer) : AnyShapeStyle(.regularMaterial))
+        )
+        .contentShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .onTapGesture {
             model.selectSubscription(id)
             dismiss()
-        } label: {
-            HStack(spacing: 16) {
-                ZStack {
-                    RoundedRectangle(cornerRadius: 12, style: .continuous)
-                        .fill(isSelected ? Chumpy.accent : Chumpy.secondaryContainer)
-                        .frame(width: 40, height: 40)
-                    Image(systemName: "externaldrive.fill")
-                        .font(.system(size: 17, weight: .medium))
-                        .foregroundStyle(isSelected ? Color.white : Color.accentColor)
-                }
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(name)
-                        .font(.system(size: 16, weight: .semibold))
-                        .foregroundStyle(.primary)
-                        .lineLimit(1)
-                    Text(subtitle)
-                        .font(.system(size: 12))
-                        .foregroundStyle(Color.secondary)
-                        .lineLimit(1)
-                        .truncationMode(.middle)
-                }
-                Spacer(minLength: 8)
-                if isSelected {
-                    Image(systemName: "checkmark")
-                        .font(.system(size: 15, weight: .semibold))
-                        .foregroundStyle(Color.accentColor)
-                }
-            }
-            .padding(16)
-            .frame(minHeight: 72)
-            .background(
-                RoundedRectangle(cornerRadius: 20, style: .continuous)
-                    .fill(isSelected ? Chumpy.primaryContainer : Chumpy.surfaceContainer)
-            )
         }
-        .buttonStyle(.plain)
         .contextMenu {
             Button(role: .destructive) {
                 model.deleteSubscription(id)
@@ -849,7 +850,7 @@ private struct SubscriptionChooserSheet: View {
             .frame(minHeight: 72)
             .background(
                 RoundedRectangle(cornerRadius: 20, style: .continuous)
-                    .fill(Chumpy.surfaceContainer)
+                    .fill(AnyShapeStyle(.regularMaterial))
             )
         }
         .buttonStyle(.plain)

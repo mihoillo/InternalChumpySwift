@@ -43,16 +43,14 @@ struct ChumpyCardShape: Shape {
 
 extension View {
 
-    /// The Chumpy tonal card: 28dp continuous corners, `surfaceContainer`
-    /// tone, a hairline stroke.
+    /// The Chumpy card: 28dp continuous corners over the native frosted
+    /// material — the blur the platform gives — with a hairline stroke.
     func chumpyCard(radius: CGFloat = Chumpy.cardRadius) -> some View {
-        background(
-            ChumpyCardShape().fill(Chumpy.surfaceContainer)
-        )
-        .overlay(
-            ChumpyCardShape(radius: radius)
-                .stroke(Color.primary.opacity(0.05), lineWidth: 0.5)
-        )
+        background(.regularMaterial, in: ChumpyCardShape(radius: radius))
+            .overlay(
+                ChumpyCardShape(radius: radius)
+                    .stroke(Color.primary.opacity(0.05), lineWidth: 0.5)
+            )
     }
 
     /// A filled group container piece with per-corner trims — the grouped
