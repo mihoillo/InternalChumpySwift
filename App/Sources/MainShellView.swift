@@ -65,11 +65,15 @@ struct MainShellView: View {
 
             // The frosted backdrop under the bar: no hard edge, no empty
             // zone — the pages flow under it and dissolve into a real
-            // blur that gains strength towards the screen's bottom.
-            EdgeBlur(edge: .bottom)
-                .frame(height: bottomBlurHeight)
-                .allowsHitTesting(false)
-                .ignoresSafeArea(edges: .bottom)
+            // blur that gains strength towards the screen's bottom. Home
+            // never scrolls and holds its ground clear, same as up top.
+            if page != .home {
+                EdgeBlur(edge: .bottom)
+                    .frame(height: bottomBlurHeight)
+                    .allowsHitTesting(false)
+                    .ignoresSafeArea(edges: .bottom)
+                    .transition(.opacity)
+            }
 
             // The mirror up top — the scrolling pages wear the same
             // dissolve under their navigation bars. Home never scrolls

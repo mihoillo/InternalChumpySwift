@@ -52,16 +52,16 @@ final class ProgressiveBlurView: UIView {
     private let fullRadius: CGFloat = 12
 
     /// The backdrop sampler. Its own material paint is stripped once the
-    /// variable blur takes over.
-    private let blurView = UIVisualEffectView(effect: UIBlurEffect(style: .systemUltraThinMaterial))
+    /// variable blur takes over — `.regular`, the one recipe every working
+    /// variable blur is built on.
+    private let blurView = UIVisualEffectView(effect: UIBlurEffect(style: .regular))
 
     /// The mask ramp, sized to the band and handed to the blur filter.
     private var rampImage: CGImage?
 
-    /// The effect view's internals, held weakly — UIKit rebuilds them at
-    /// will, and a stale reference must not survive the rebuild.
+    /// The effect view's backdrop, held weakly — UIKit rebuilds its
+    /// internals at will, and a stale reference must not survive.
     private weak var backdropView: UIView?
-    private weak var overlayView: UIView?
 
     /// The filter currently installed, weakly: if UIKit puts its own set
     /// back on the backdrop layer, ours releases — and the identity check
@@ -159,35 +159,51 @@ final class ProgressiveBlurView: UIView {
     /// Puts the variable-blur filter on the effect view's backdrop layer —
     /// or, where it can't be built, the masked-material fallback.
     private func installBlurFilter() {
-        // The internals are cached weakly and re-looked-up whenever UIKit
-        // has rebuilt them.
+        // The backdrop is cached weakly and re-looked-up whenever UIKit has
+        // rebuilt the internals.
         if backdropView?.superview !== blurView {
             backdropView = Self.internalSubview(of: blurView, called: "backdrop")
         }
-        if overlayView?.superview !== blurView {
-            overlayView = Self.internalSubview(of: blurView, called: "subview")
+
+        guard needsRebuild || !oursIsInstalled else {
+            fadeMaterialPaint(ours: true)
+            return
         }
-
-        let mine = (backdropView?.layer.filters?.first as? NSObject) === installedFilter
-        // While the variable blur is ours, the material's static paint is a
-        // haze over clean frost — keep it out; bring it back whenever ours
-        // is off.
-        overlayView?.isHidden = mine
-
-        guard needsRebuild || !mine else { return }
         guard let backdropView, let rampImage else { return }
 
         guard let filter = Self.makeVariableBlurFilter(mask: rampImage, radius: fullRadius) else {
             mountFallbackMask()
+            fadeMaterialPaint(ours: false)
             return
         }
 
         blurView.layer.mask = nil
         backdropView.layer.filters = [filter]
-        // A finer backdrop capture, so the ramp's shallow end stays crisp.
-        backdropView.layer.setValue(0.75, forKey: "scale")
+        // The backdrop's capture resolution. At the default the pass-through
+        // end of the ramp shows a coarse, misaligned copy of the content
+        // under it — the doubling ghost. The screen's native scale keeps
+        // the capture pixel-exact, and the capture reaches the band's whole
+        // height, home-indicator strip included.
+        backdropView.layer.setValue(window?.screen.scale ?? 1.0, forKey: "scale")
         installedFilter = filter
         needsRebuild = false
+        fadeMaterialPaint(ours: true)
+    }
+
+    /// Whether the filter on the backdrop layer is still ours — UIKit puts
+    /// its own set back on lighting changes and the like.
+    private var oursIsInstalled: Bool {
+        (backdropView?.layer.filters?.first as? NSObject) === installedFilter
+    }
+
+    /// While the variable blur is ours, the material's own paint — tint,
+    /// vibrancy, whatever else the system layers on — is a haze over clean
+    /// frost: every subview but the backdrop is faded out, and brought
+    /// back whenever ours is off.
+    private func fadeMaterialPaint(ours: Bool) {
+        for subview in blurView.subviews where subview !== backdropView {
+            subview.alpha = ours ? 0 : 1
+        }
     }
 
     /// The degraded paint. Retried only when a new window or a trait change
