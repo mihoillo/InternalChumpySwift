@@ -472,7 +472,7 @@ struct EdgeScrollView<Content: View>: View {
     private var legacyScrollView: some View {
         ScrollView {
             content()
-                .background(ScrollOffsetSpy(reporter: reporter, tag: tag))
+                .background(ScrollOffsetSpy(reporter: reporter, pageTag: tag))
         }
     }
 }
@@ -483,10 +483,11 @@ struct EdgeScrollView<Content: View>: View {
 /// scroll views — the UIScrollView never does.
 private struct ScrollOffsetSpy: UIViewRepresentable {
     let reporter: ScrollReporter
-    let tag: String
+    /// Named `pageTag` — a UIView already owns a `tag` of its own.
+    let pageTag: String
 
     func makeUIView(context: Context) -> ScrollOffsetSpyView {
-        ScrollOffsetSpyView(reporter: reporter, tag: tag)
+        ScrollOffsetSpyView(reporter: reporter, pageTag: pageTag)
     }
 
     func updateUIView(_ view: ScrollOffsetSpyView, context: Context) {}
@@ -494,13 +495,14 @@ private struct ScrollOffsetSpy: UIViewRepresentable {
 
 private final class ScrollOffsetSpyView: UIView {
     private let reporter: ScrollReporter
-    private let tag: String
+    /// Named `pageTag` — a UIView already owns a `tag` of its own.
+    private let pageTag: String
     private var scrollView: UIScrollView?
     private var observations: [NSKeyValueObservation] = []
 
-    init(reporter: ScrollReporter, tag: String) {
+    init(reporter: ScrollReporter, pageTag: String) {
         self.reporter = reporter
-        self.tag = tag
+        self.pageTag = pageTag
         super.init(frame: .zero)
         isUserInteractionEnabled = false
     }
@@ -559,7 +561,7 @@ private final class ScrollOffsetSpyView: UIView {
         // reads as points traveled from the start, zero-based.
         let scrolled = max(0, scroll.contentOffset.y + scroll.adjustedContentInset.top)
         reporter.metrics = ScrollMetrics(
-            tag: tag,
+            tag: pageTag,
             scrolled: scrolled,
             belowFold: max(0, scroll.contentSize.height - scrolled - scroll.bounds.height)
         )
