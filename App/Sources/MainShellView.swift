@@ -103,6 +103,16 @@ struct MainShellView: View {
         }
     }
 
+    /// TEMPORARY — the scroll's pulse, on screen while the frost is
+    /// being tuned: it tells a dead reporter from a deaf blur in one
+    /// glance. Goes away once the frost is settled.
+    private var debugLine: String {
+        String(
+            format: "s %.0f  b %.0f  T %.2f  B %.2f",
+            scrolled, belowFold, topStrength, bottomStrength
+        )
+    }
+
     var body: some View {
         ZStack(alignment: .bottom) {
             content
@@ -140,6 +150,17 @@ struct MainShellView: View {
                     .frame(maxHeight: .infinity, alignment: .bottom)
                     .transition(.opacity)
             }
+
+            // TEMPORARY — the scroll's pulse, see debugLine. Tiny,
+            // dead to touches, gone in the commit after the frost is
+            // settled.
+            Text(debugLine)
+                .font(.system(size: 10, design: .monospaced))
+                .foregroundStyle(.secondary)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                .padding(.leading, 4)
+                .padding(.top, 2)
+                .allowsHitTesting(false)
 
             bar
                 .padding(.horizontal, 16)

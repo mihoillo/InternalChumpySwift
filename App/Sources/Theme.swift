@@ -417,15 +417,51 @@ final class ScrollReporter: ObservableObject {
     @Published var metrics = ScrollMetrics()
 }
 
-/// A ScrollView that reports its travel to the shell's reporter: a spy
-/// view inside the content hooks the real UIScrollView and watches its
-/// offset — the one source that never lies about the scroll.
+/// A ScrollView that reports its travel to the shell's reporter. On
+/// iOS 18+ the system's own onScrollGeometryChange speaks it — the
+/// first-class API, the same word the system's chrome hears. Below
+/// that, a spy view inside the content hooks the real UIScrollView and
+/// watches its offset — the one source that never lies about the
+/// scroll.
 struct EdgeScrollView<Content: View>: View {
     @ObservedObject private var reporter = ScrollReporter.shared
 
     @ViewBuilder var content: () -> Content
 
     var body: some View {
+        #if compiler(>=6.0)
+        if #available(iOS 18.0, *) {
+            modernScrollView
+        } else {
+            legacyScrollView
+        }
+        #else
+        legacyScrollView
+        #endif
+    }
+
+    /// The system's own word on the scroll, where the system speaks it.
+    @available(iOS 18.0, *)
+    private var modernScrollView: some View {
+        ScrollView {
+            content()
+        }
+        .onScrollGeometryChange(for: ScrollMetrics.self) { geo in
+            // A scroll view at rest can sit at a negative offset — its
+            // top inset. The inset folds back in, so "scrolled" reads as
+            // points traveled from the start, zero-based.
+            let scrolled = max(0, geo.contentOffset.y + geo.contentInsets.top)
+            return ScrollMetrics(
+                scrolled: scrolled,
+                belowFold: max(0, geo.contentSize.height - scrolled - geo.containerSize.height)
+            )
+        } action: { _, metrics in
+            reporter.metrics = metrics
+        }
+    }
+
+    /// The UIKit spy, for the systems that predate the official word.
+    private var legacyScrollView: some View {
         ScrollView {
             content()
                 .background(ScrollOffsetSpy(reporter: reporter))
@@ -507,9 +543,13 @@ private final class ScrollOffsetSpyView: UIView {
     }
 
     private func report(_ scroll: UIScrollView) {
+        // A scroll view at rest can sit at a negative offset — its
+        // adjusted top inset. The inset folds back in, so "scrolled"
+        // reads as points traveled from the start, zero-based.
+        let scrolled = max(0, scroll.contentOffset.y + scroll.adjustedContentInset.top)
         reporter.metrics = ScrollMetrics(
-            scrolled: max(0, scroll.contentOffset.y),
-            belowFold: max(0, scroll.contentSize.height - scroll.contentOffset.y - scroll.bounds.height)
+            scrolled: scrolled,
+            belowFold: max(0, scroll.contentSize.height - scrolled - scroll.bounds.height)
         )
     }
 }

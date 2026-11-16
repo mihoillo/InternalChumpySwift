@@ -137,22 +137,26 @@ final class ProgressiveBlurView: UIView {
         setNeedsLayout()
     }
 
-    /// Rides the scroll: the live filter's own radius is scaled in
-    /// place — reassigning the layer's filter set on every frame of
-    /// travel disturbs the backdrop's rendering, a mutated input just
-    /// re-renders. The ramp itself stays untouched: the mask scales the
-    /// radius point by point, so scaling the radius scales the whole
-    /// dissolve.
+    /// The frost's strength steps — coarse enough that a gesture
+    /// rebuilds the ramp a handful of times instead of every frame, fine
+    /// enough that the fade still reads smooth.
+    private static let strengthSteps: CGFloat = 16
+
+    /// Rides the scroll. Every step goes the full proven road — a fresh
+    /// ramp with the values scaled by the strength, a fresh filter, a
+    /// fresh assignment on the backdrop layer: the same install that
+    /// built the frost in the first place. (Mutating a live filter's
+    /// radius in place proved not to re-render.)
     func setStrength(_ newValue: CGFloat) {
         let clamped = max(0, min(1, newValue))
-        guard clamped != strength else { return }
-        strength = clamped
-        if let filter = installedFilter {
-            filter.setValue(fullRadius * clamped, forKey: "inputRadius")
-        } else {
-            needsRebuild = true
-            setNeedsLayout()
+        let quantized = (clamped * Self.strengthSteps).rounded() / Self.strengthSteps
+        guard quantized != strength else { return }
+        strength = quantized
+        if rampLength > 1 {
+            rampImage = Self.makeRamp(length: rampLength, edge: edge, strength: quantized)
         }
+        needsRebuild = true
+        setNeedsLayout()
     }
 
     override func layoutSubviews() {
@@ -168,7 +172,7 @@ final class ProgressiveBlurView: UIView {
         let length = Int(bounds.height.rounded(.up))
         if length != rampLength {
             rampLength = length
-            rampImage = Self.makeRamp(length: length, edge: edge)
+            rampImage = Self.makeRamp(length: length, edge: edge, strength: strength)
             needsRebuild = true
         }
         installBlurFilter()
@@ -199,7 +203,7 @@ final class ProgressiveBlurView: UIView {
             Self.learnFilterFactory(from: backdropView)
         }
 
-        guard let filter = Self.makeVariableBlurFilter(mask: rampImage, radius: fullRadius * strength) else {
+        guard let filter = Self.makeVariableBlurFilter(mask: rampImage, radius: fullRadius) else {
             // The private filter is unreachable — no flat gradient stands
             // in and fakes it: the band hides, and the pass keeps the
             // rebuild pending so a later layout retries.
@@ -282,8 +286,9 @@ final class ProgressiveBlurView: UIView {
     /// A one-pixel-wide strip, one pixel per band point: black at alpha 0
     /// where the blur must vanish, at alpha 255 where it is full. The
     /// variable-blur filter reads it per pixel as the blur amount. Row 0
-    /// renders at the band's top.
-    private static func makeRamp(length: Int, edge: EdgeBlur.Edge) -> CGImage? {
+    /// renders at the band's top. The strength scales the whole ramp —
+    /// the blur dissolves by blurring less, never by fading the view.
+    private static func makeRamp(length: Int, edge: EdgeBlur.Edge, strength: CGFloat) -> CGImage? {
         guard length > 1 else { return nil }
 
         guard let context = CGContext(
@@ -301,7 +306,7 @@ final class ProgressiveBlurView: UIView {
             let position = CGFloat(row) / CGFloat(length - 1)
             // A straight ramp: the radius slides evenly along the band, and
             // the dissolve carries the smoothness.
-            let amount = edge == .top ? 1 - position : position
+            let amount = (edge == .top ? 1 - position : position) * strength
             pixels[row * 2] = 0
             pixels[row * 2 + 1] = UInt8(max(0, min(255, amount * 255)))
         }
