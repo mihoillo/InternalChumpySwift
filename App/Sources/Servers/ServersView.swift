@@ -221,7 +221,7 @@ struct ServersView: View {
         // The empty page doesn't scroll, so it speaks the metrics itself:
         // no travel, nothing below the fold — both frosts stay asleep.
         .onAppear {
-            ScrollReporter.shared.metrics = ScrollMetrics(tag: "servers")
+            ScrollReporter.shared.report(ScrollMetrics(tag: "servers"))
         }
     }
 }

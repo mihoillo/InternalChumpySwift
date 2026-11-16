@@ -422,14 +422,22 @@ struct ScrollMetrics: Equatable {
     var belowFold: CGFloat = 0
 }
 
-/// The live page's scroll, reported to the shell. The pages'
-/// EdgeScrollViews write here — the system's own geometry word on
-/// iOS 18+, a KVO spy on the real UIScrollView below. A singleton:
-/// the app has one shell, one live page at a time.
+/// The pages' scroll, reported to the shell: every page keeps its own
+/// word here, by tag — the system's own geometry word on iOS 18+, a
+/// KVO spy on the real UIScrollView below. The shell heeds only the
+/// page it stands on, but each one's word outlives the rides between
+/// pages, so the frost is at its strength the moment a page arrives,
+/// not a beat after.
 final class ScrollReporter: ObservableObject {
     static let shared = ScrollReporter()
 
-    @Published var metrics = ScrollMetrics(tag: "")
+    /// Every page's word, by its tag.
+    @Published private(set) var metricsByTag: [String: ScrollMetrics] = [:]
+
+    func report(_ metrics: ScrollMetrics) {
+        guard metricsByTag[metrics.tag] != metrics else { return }
+        metricsByTag[metrics.tag] = metrics
+    }
 }
 
 /// A ScrollView that reports its travel to the shell's reporter. On
@@ -442,7 +450,9 @@ struct EdgeScrollView<Content: View>: View {
     /// The page this scroll speaks for — the shell heeds only the
     /// page it stands on.
     let tag: String
-    @ObservedObject private var reporter = ScrollReporter.shared
+    /// A plain hold on the shared reporter — the scroll only writes
+    /// its word; it never re-renders on the shell's reads.
+    private let reporter = ScrollReporter.shared
 
     @ViewBuilder var content: () -> Content
 
@@ -475,7 +485,7 @@ struct EdgeScrollView<Content: View>: View {
                 belowFold: max(0, geo.contentSize.height - scrolled - geo.containerSize.height)
             )
         } action: { _, metrics in
-            reporter.metrics = metrics
+            reporter.report(metrics)
         }
     }
 
@@ -571,10 +581,12 @@ private final class ScrollOffsetSpyView: UIView {
         // adjusted top inset. The inset folds back in, so "scrolled"
         // reads as points traveled from the start, zero-based.
         let scrolled = max(0, scroll.contentOffset.y + scroll.adjustedContentInset.top)
-        reporter.metrics = ScrollMetrics(
-            tag: pageTag,
-            scrolled: scrolled,
-            belowFold: max(0, scroll.contentSize.height - scrolled - scroll.bounds.height)
+        reporter.report(
+            ScrollMetrics(
+                tag: pageTag,
+                scrolled: scrolled,
+                belowFold: max(0, scroll.contentSize.height - scrolled - scroll.bounds.height)
+            )
         )
     }
 }
