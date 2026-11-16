@@ -291,6 +291,13 @@ struct HomeView: View {
         .buttonStyle(.plain)
         .disabled(appState.isProcessing)
     }
+
+    private var connectFill: CGFloat {
+        switch appState.status {
+        case .connected, .reasserting, .connecting: return 1
+        default: return 0
+        }
+    }
 }
 
 // MARK: - Error card
