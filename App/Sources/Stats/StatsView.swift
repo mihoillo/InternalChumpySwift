@@ -12,27 +12,25 @@ struct StatsView: View {
     private let ticker = Timer.publish(every: 1.5, on: .main, in: .common).autoconnect()
 
     var body: some View {
-        NavHost {
-            ScrollView {
-                VStack(spacing: 12) {
-                    WeekTrafficCard(week: week)
+        EdgeScrollView {
+            VStack(spacing: 12) {
+                PageLargeTitle(titleKey: "tab.stats")
 
-                    ChartHeader(icon: "arrow.down.circle", title: "stats.trafficTotal")
-                        .padding(.horizontal, 4)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                    totalTrafficCard
+                WeekTrafficCard(week: week)
 
-                    ChartHeader(icon: "doc.text", title: "stats.coreLog")
-                        .padding(.horizontal, 4)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                    coreLogCard
-                }
-                .padding(.horizontal, 16)
-                .padding(.top, 8)
-                .padding(.bottom, 104)
+                ChartHeader(icon: "arrow.down.circle", title: "stats.trafficTotal")
+                    .padding(.horizontal, 4)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                totalTrafficCard
+
+                ChartHeader(icon: "doc.text", title: "stats.coreLog")
+                    .padding(.horizontal, 4)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                coreLogCard
             }
-            .navigationTitle("tab.stats")
-            .navigationBarTitleDisplayMode(.inline)
+            .padding(.horizontal, 16)
+            .padding(.top, chumpyHeaderHeight + 8)
+            .padding(.bottom, 104)
         }
         .onAppear { reload() }
         .onReceive(ticker) { _ in

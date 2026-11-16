@@ -12,6 +12,12 @@ struct MainShellView: View {
     @State private var lastTab: Tab = .home
     @Namespace private var tabNamespace
 
+    /// The scroll metrics the live page reports up: the content's frame
+    /// in the scroll space, and the viewport's height. Home reports
+    /// nothing and holds its ground clear.
+    @State private var scrollContent: CGRect = .zero
+    @State private var scrollViewport: CGFloat = 0
+
     enum Tab: Int, CaseIterable, Identifiable {
         case home, servers, stats
 
@@ -54,35 +60,85 @@ struct MainShellView: View {
     /// of the page beneath it.
     private let barMotion = Animation.spring(response: 0.34, dampingFraction: 0.72)
 
-    /// How tall the fading blurs run from each screen edge.
-    private let bottomBlurHeight: CGFloat = 160
-    private let topBlurHeight: CGFloat = 140
+    /// How tall the frost runs from the bar's edge — the bar's own
+    /// height plus its lift, so the dissolve starts with the bar and not
+    /// far above it.
+    private let bottomBlurHeight: CGFloat = 88
+
+    /// How far the page must travel for a frost to commit or hold: the
+    /// header frost is fully on after this much scroll, the bar frost
+    /// fully off with this little left below the fold.
+    private let blurCommitDistance: CGFloat = 40
+
+    // MARK: - The scroll's word on the frost
+
+    /// How far the page has traveled from its start.
+    private var scrolled: CGFloat {
+        max(0, -scrollContent.minY)
+    }
+
+    /// How much content still waits below the fold — zero at the end.
+    private var belowFold: CGFloat {
+        max(0, scrollContent.height - scrolled - scrollViewport)
+    }
+
+    /// The header frost's strength: off at the start, committed once the
+    /// page has traveled the commit distance.
+    private var topStrength: CGFloat {
+        min(1, scrolled / blurCommitDistance)
+    }
+
+    /// The bar frost's strength: committed while content waits below the
+    /// fold, off at the list's end.
+    private var bottomStrength: CGFloat {
+        min(1, belowFold / blurCommitDistance)
+    }
+
+    /// The live page's name — the header's small centered title.
+    private var pageTitleKey: LocalizedStringKey {
+        switch page {
+        case .home: return "tab.home"
+        case .servers: return "tab.servers"
+        case .stats: return "tab.stats"
+        case .settings: return "tab.settings"
+        }
+    }
 
     var body: some View {
         ZStack(alignment: .bottom) {
             content
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .onPreferenceChange(ScrollContentKey.self) { scrollContent = $0 }
+                .onPreferenceChange(ScrollViewportKey.self) { scrollViewport = $0 }
 
-            // The frost at the screen's edges: the pages flow under it and
-            // dissolve into a real blur that gains strength towards each
-            // edge — anchored at the physical frame, past the safe areas,
-            // under the status bar and the home indicator alike. The plain
-            // frame sizes each band, the background carries it into the
-            // unsafe zones, and the outer frame pins it to its own edge —
-            // the ZStack's bottom alignment must not drag the top band
-            // down onto the bar. Home never scrolls and holds its ground
-            // clear.
+            // The frost at the screen's edges, run by the scroll. The
+            // pages carry their own large title in the content; the header
+            // strip up here is its folded state — the small centered
+            // title over the header frost, both waking together as the
+            // page leaves its start. The bar frost sleeps again once the
+            // page reaches its end. Both are anchored at the physical
+            // frame, past the safe areas, under the status bar and the
+            // home indicator alike; the plain frame sizes each band, the
+            // background carries it into the unsafe zones, and the outer
+            // frame pins it to its own edge. Home never scrolls and holds
+            // its ground clear.
             if page != .home {
                 Color.clear
-                    .frame(height: topBlurHeight)
-                    .background(EdgeBlur(edge: .top).ignoresSafeArea(edges: .top))
+                    .frame(height: chumpyHeaderHeight)
+                    .overlay(
+                        Text(pageTitleKey)
+                            .font(.system(size: 17, weight: .semibold))
+                            .lineLimit(1)
+                            .opacity(topStrength)
+                    )
+                    .background(EdgeBlur(edge: .top, strength: topStrength).ignoresSafeArea(edges: .top))
                     .allowsHitTesting(false)
                     .frame(maxHeight: .infinity, alignment: .top)
                     .transition(.opacity)
 
                 Color.clear
                     .frame(height: bottomBlurHeight)
-                    .background(EdgeBlur(edge: .bottom).ignoresSafeArea(edges: .bottom))
+                    .background(EdgeBlur(edge: .bottom, strength: bottomStrength).ignoresSafeArea(edges: .bottom))
                     .allowsHitTesting(false)
                     .frame(maxHeight: .infinity, alignment: .bottom)
                     .transition(.opacity)
@@ -128,6 +184,8 @@ struct MainShellView: View {
         withAnimation(barMotion) {
             page = Page(tab: tab)
             lastTab = tab
+            scrollContent = .zero
+            scrollViewport = 0
         }
     }
 
@@ -205,6 +263,8 @@ struct MainShellView: View {
         return Button {
             withAnimation(barMotion) {
                 page = onSettings ? Page(tab: lastTab) : .settings
+                scrollContent = .zero
+                scrollViewport = 0
             }
         } label: {
             Image(systemName: "gearshape.fill")

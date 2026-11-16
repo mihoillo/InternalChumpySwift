@@ -391,3 +391,74 @@ extension View {
         NavHost { self }
     }
 }
+
+// MARK: - Edge scroll & the page's large title
+
+/// The collapsing header's strip height — the small centered title's
+/// home. The pages pad their scroll content down by it, so the large
+/// title starts below the strip and scrolls under it.
+let chumpyHeaderHeight: CGFloat = 44
+
+/// The scroll content's frame in the "chumpy.scroll" space, reported up
+/// to the shell: its minY is the page's travel, its height the content's
+/// full extent.
+struct ScrollContentKey: PreferenceKey {
+    static var defaultValue: CGRect = .zero
+
+    static func reduce(value: inout CGRect, nextValue: () -> CGRect) {
+        value = nextValue()
+    }
+}
+
+/// The scroll viewport's height — how much of the page is on screen.
+struct ScrollViewportKey: PreferenceKey {
+    static var defaultValue: CGFloat = 0
+
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = nextValue()
+    }
+}
+
+/// A ScrollView that reports its content's travel and its viewport's
+/// height up the tree, so the shell can run its edge blurs with the
+/// scroll: the header frost wakes as the page leaves its start, the bar
+/// frost sleeps as the page reaches its end.
+struct EdgeScrollView<Content: View>: View {
+    @ViewBuilder var content: () -> Content
+
+    var body: some View {
+        ScrollView {
+            content()
+                .background(
+                    GeometryReader { geo in
+                        Color.clear.preference(
+                            key: ScrollContentKey.self,
+                            value: geo.frame(in: .named("chumpy.scroll"))
+                        )
+                    }
+                )
+        }
+        .coordinateSpace(name: "chumpy.scroll")
+        .background(
+            GeometryReader { geo in
+                Color.clear.preference(
+                    key: ScrollViewportKey.self,
+                    value: geo.size.height
+                )
+            }
+        )
+    }
+}
+
+/// The page's own large title, riding the scroll content: 34pt bold,
+/// leading-aligned — the page's name while it sits at its start. The
+/// shell's small centered header title takes over as the page scrolls.
+struct PageLargeTitle: View {
+    let titleKey: LocalizedStringKey
+
+    var body: some View {
+        Text(titleKey)
+            .font(.system(size: 34, weight: .bold))
+            .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}

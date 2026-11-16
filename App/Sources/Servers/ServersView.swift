@@ -14,18 +14,11 @@ struct ServersView: View {
     @State private var showSubscriptionChooser = false
 
     var body: some View {
-        NavHost {
-            Group {
-                if model.profiles.isEmpty && model.subscriptions.isEmpty {
-                    emptyState
-                } else {
-                    list
-                }
-            }
-            .navigationTitle("tab.servers")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) { addMenu }
+        Group {
+            if model.profiles.isEmpty && model.subscriptions.isEmpty {
+                emptyState
+            } else {
+                list
             }
         }
         .onAppear {
@@ -52,8 +45,10 @@ struct ServersView: View {
     // MARK: - List
 
     private var list: some View {
-        ScrollView {
+        EdgeScrollView {
             VStack(spacing: 12) {
+                PageLargeTitle(titleKey: "tab.servers")
+
                 if let error = model.error {
                     ErrorCard(message: error)
                 }
@@ -70,7 +65,7 @@ struct ServersView: View {
                 rows
             }
             .padding(.horizontal, 16)
-            .padding(.top, 8)
+            .padding(.top, chumpyHeaderHeight + 8)
             .padding(.bottom, 104)
         }
     }
@@ -197,6 +192,7 @@ struct ServersView: View {
 
     private var emptyState: some View {
         VStack(spacing: 14) {
+            PageLargeTitle(titleKey: "tab.servers")
             Spacer()
             Image(systemName: "square.stack.3d.up.slash")
                 .font(.system(size: 44))
@@ -221,26 +217,14 @@ struct ServersView: View {
             .buttonStyle(.plain)
             Spacer()
         }
+        .padding(.horizontal, 16)
+        .padding(.top, chumpyHeaderHeight + 8)
+        .padding(.bottom, 104)
         .frame(maxWidth: .infinity)
-    }
-
-    // MARK: - Toolbar
-
-    private var addMenu: some View {
-        Menu {
-            Button {
-                showAddSubscription = true
-            } label: {
-                Label("servers.add.subscription", systemImage: "link.badge.plus")
-            }
-            Button {
-                showPasteLinks = true
-            } label: {
-                Label("servers.add.paste", systemImage: "doc.on.clipboard")
-            }
-        } label: {
-            Image(systemName: "plus")
-        }
+        // The empty page doesn't scroll, so it speaks the metrics itself:
+        // no travel, nothing below the fold — both frosts stay asleep.
+        .preference(key: ScrollContentKey.self, value: .zero)
+        .preference(key: ScrollViewportKey.self, value: 0)
     }
 }
 

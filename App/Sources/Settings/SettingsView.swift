@@ -17,19 +17,17 @@ struct SettingsView: View {
     ) private var testURL: String = "https://www.gstatic.com/generate_204"
 
     var body: some View {
-        NavHost {
-            ScrollView {
-                VStack(spacing: 12) {
-                    connectionCard
-                    tunnelCard
-                    aboutCard
-                }
-                .padding(.horizontal, 16)
-                .padding(.top, 8)
-                .padding(.bottom, 104)
+        EdgeScrollView {
+            VStack(spacing: 12) {
+                PageLargeTitle(titleKey: "tab.settings")
+
+                connectionCard
+                tunnelCard
+                aboutCard
             }
-            .navigationTitle("tab.settings")
-            .navigationBarTitleDisplayMode(.inline)
+            .padding(.horizontal, 16)
+            .padding(.top, chumpyHeaderHeight + 8)
+            .padding(.bottom, 104)
         }
     }
 
