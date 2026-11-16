@@ -529,7 +529,7 @@ private struct ServerGroupRow: View {
                 // Android client wears it — over the group's edge.
                 Image(systemName: "pin.fill")
                     .font(.system(size: 11, weight: .semibold))
-                    .foregroundStyle(Color.accentColor)
+                    .foregroundStyle(isSelected ? Color.white : Color.accentColor)
                     .rotationEffect(.degrees(30))
                     .offset(x: 14, y: -11)
                     .padding(.trailing, 10)
@@ -540,14 +540,15 @@ private struct ServerGroupRow: View {
     }
 
     /// The row's own paint, riding behind the content as its background —
-    /// the group's outer 28pt / inner 4pt corner law. The native frost
-    /// lies beneath always; the selected tint fades over it — never a
-    /// swap between paints, for the swap animates between styles that
-    /// don't blend and renders black.
+    /// the group's outer 28pt / inner 4pt corner law. The resting row
+    /// wears the native frost; the selected one the accent's own solid
+    /// plate — never a transparent wash. The layers crossfade, for a
+    /// style swap animates between styles that don't blend and
+    /// renders black.
     private var rowFill: some View {
         ZStack {
             rowShape.fill(.regularMaterial)
-            rowShape.fill(Chumpy.primaryContainer)
+            rowShape.fill(Chumpy.accent)
                 .opacity(isSelected ? 1 : 0)
         }
         .animation(.easeInOut(duration: 0.18), value: isSelected)
@@ -570,6 +571,7 @@ private struct ServerGroupRow: View {
                 HStack(alignment: .firstTextBaseline, spacing: 0) {
                     Text(title)
                         .font(.system(size: 16, weight: .medium))
+                        .foregroundStyle(isSelected ? Color.white : Color.primary)
                         .lineLimit(1)
                         .truncationMode(.middle)
                     if let pingText {
@@ -581,7 +583,7 @@ private struct ServerGroupRow: View {
                 }
                 Text(subtitle)
                     .font(.system(size: 13))
-                    .foregroundStyle(Color.secondary)
+                    .foregroundStyle(isSelected ? Color.white.opacity(0.78) : Color.secondary)
                     .lineLimit(1)
                     .truncationMode(.middle)
             }
@@ -591,7 +593,7 @@ private struct ServerGroupRow: View {
             if profile.concealed {
                 Image(systemName: "eye.slash")
                     .font(.system(size: 14))
-                    .foregroundStyle(Color.secondary)
+                    .foregroundStyle(isSelected ? Color.white : Color.secondary)
             }
         }
         .padding(.horizontal, 16)
@@ -605,13 +607,13 @@ private struct ServerGroupRow: View {
         }
     }
 
-    /// The square 40pt tile with a 10pt corner: tonal, the accent's own
-    /// fill when picked — the flag rides the slot, names without one keep
-    /// the globe, balancers keep the explore compass.
+    /// The square 40pt tile with a 10pt corner: white-tinted over the
+    /// accent plate, tonal at rest — the flag rides the slot, names
+    /// without one keep the globe, balancers keep the explore compass.
     private var tile: some View {
         ZStack {
             RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .fill(isSelected ? Chumpy.accent : Chumpy.secondaryContainer)
+                .fill(isSelected ? Color.white.opacity(0.16) : Chumpy.secondaryContainer)
                 .frame(width: 40, height: 40)
             if let flag = leadingFlagEmoji {
                 Text(flag)
@@ -665,7 +667,12 @@ private struct ServerGroupRow: View {
 
     /// 200 ms is where the server starts feeling far away: from there the
     /// tail takes the accent tone, matching the home ping chip's law.
+    /// On the selected plate the tail rides white, like all the row's
+    /// ink.
     private var pingColor: Color {
+        if isSelected {
+            return Color.white.opacity(0.85)
+        }
         if let delay = profile.testDelayMillis, delay >= 200 {
             return Color.accentColor
         }
@@ -727,9 +734,11 @@ private struct ServerGroupRow: View {
 // MARK: - Subscription chooser sheet
 
 /// The groups' own chooser: the subscription card's tap opens it — the
-/// standing one wears the tint and its checkmark, a long-press asks the
-/// delete (the same context menu the server rows wear), and the one add
-/// row at the bottom opens the dialog.
+/// same grouped list the servers page wears: one continuous card, the
+/// outer 28pt corners at the group's own edges and the 4pt ones inside,
+/// the standing row on the accent's solid plate with its white check.
+/// A long-press asks the delete, the same context menu the server rows
+/// wear; the add row closes the group.
 private struct SubscriptionChooserSheet: View {
     @ObservedObject var model: ServersViewModel
     var onAddSubscription: () -> Void
@@ -738,9 +747,10 @@ private struct SubscriptionChooserSheet: View {
     var body: some View {
         NavHost {
             ScrollView {
-                VStack(spacing: 8) {
-                    if model.manualProfileCount > 0 {
-                        row(
+                VStack(spacing: 2) {
+                    let hasStandalone = model.manualProfileCount > 0
+                    if hasStandalone {
+                        groupRow(
                             id: standaloneSubscriptionID,
                             name: String(localized: "servers.standalone", bundle: .main),
                             subtitle: String(
@@ -748,17 +758,18 @@ private struct SubscriptionChooserSheet: View {
                                     "servers.standalone.subtitle", bundle: .main, comment: ""
                                 ),
                                 model.manualProfileCount
-                            )
+                            ),
+                            isFirst: true
                         )
                     }
-                    ForEach(model.subscriptions) { sub in
-                        row(
+                    ForEach(Array(model.subscriptions.enumerated()), id: \.element.id) { index, sub in
+                        groupRow(
                             id: sub.id,
                             name: sub.name.isEmpty ? sub.url : sub.name,
-                            subtitle: sub.url
+                            subtitle: sub.url,
+                            isFirst: !hasStandalone && index == 0
                         )
                     }
-
                     addRow
                 }
                 .padding(.horizontal, 16)
@@ -775,125 +786,109 @@ private struct SubscriptionChooserSheet: View {
         }
     }
 
-    /// The row's face: the tile, the name over the host, the checkmark on
-    /// the standing one — on the frosted card with the tint fading over
-    /// it when it stands. Both the row and its context-menu preview wear
-    /// it, so the menu's lifted shape is the row's own.
-    private func rowFace(name: String, subtitle: String, isSelected: Bool) -> some View {
-        HStack(spacing: 16) {
+    /// One group row, the servers list's own anatomy: the 40pt tile, the
+    /// name over the host, the checkmark on the standing one — a tap
+    /// stands it, a long-press asks its delete.
+    private func groupRow(id: String, name: String, subtitle: String, isFirst: Bool) -> some View {
+        let isSelected = model.selectedSubscriptionID == id
+
+        return HStack(spacing: 16) {
             ZStack {
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .fill(isSelected ? Chumpy.accent : Chumpy.secondaryContainer)
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .fill(isSelected ? Color.white.opacity(0.16) : Chumpy.secondaryContainer)
                     .frame(width: 40, height: 40)
                 Image(systemName: "externaldrive.fill")
                     .font(.system(size: 17, weight: .medium))
                     .foregroundStyle(isSelected ? Color.white : Color.accentColor)
             }
-            VStack(alignment: .leading, spacing: 2) {
+
+            VStack(alignment: .leading, spacing: 3) {
                 Text(name)
-                    .font(.system(size: 16, weight: .semibold))
-                    .foregroundStyle(.primary)
+                    .font(.system(size: 16, weight: .medium))
+                    .foregroundStyle(isSelected ? Color.white : Color.primary)
                     .lineLimit(1)
+                    .truncationMode(.middle)
                 Text(subtitle)
-                    .font(.system(size: 12))
-                    .foregroundStyle(Color.secondary)
+                    .font(.system(size: 13))
+                    .foregroundStyle(isSelected ? Color.white.opacity(0.78) : Color.secondary)
                     .lineLimit(1)
                     .truncationMode(.middle)
             }
-            Spacer(minLength: 8)
+
+            Spacer(minLength: 0)
+
             if isSelected {
                 Image(systemName: "checkmark")
                     .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(Color.white)
+            }
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 10)
+        .frame(minHeight: 64)
+        .background(rowFill(isFirst: isFirst, isLast: false, isSelected: isSelected))
+        .contentShape(Rectangle())
+        .onTapGesture {
+            model.selectSubscription(id)
+            dismiss()
+        }
+        .contextMenu {
+            Button(role: .destructive) {
+                model.deleteSubscription(id)
+                dismiss()
+            } label: {
+                Label("servers.deleteSubscription", systemImage: "trash")
+            }
+        }
+    }
+
+    /// The add row — the dialog's door, and the group's own closing row.
+    private var addRow: some View {
+        HStack(spacing: 16) {
+            ZStack {
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .fill(Chumpy.secondaryContainer)
+                    .frame(width: 40, height: 40)
+                Image(systemName: "plus")
+                    .font(.system(size: 17, weight: .medium))
                     .foregroundStyle(Color.accentColor)
             }
+            Text("servers.add.subscription")
+                .font(.system(size: 16, weight: .medium))
+                .foregroundStyle(Color.accentColor)
+            Spacer(minLength: 0)
         }
-        .padding(16)
-        .frame(minHeight: 72)
-        .background(
-            ZStack {
-                RoundedRectangle(cornerRadius: 20, style: .continuous)
-                    .fill(.regularMaterial)
-                RoundedRectangle(cornerRadius: 20, style: .continuous)
-                    .fill(Chumpy.primaryContainer)
-                    .opacity(isSelected ? 1 : 0)
-            }
-        )
-    }
-
-    /// One thick group row: a tap stands it, a long-press asks the
-    /// delete. The menu's own preview is the row's face — the lifted
-    /// shape matches the object, not the system's square plate.
-    @ViewBuilder
-    private func row(id: String, name: String, subtitle: String) -> some View {
-        let isSelected = model.selectedSubscriptionID == id
-        let face = rowFace(name: name, subtitle: subtitle, isSelected: isSelected)
-        if #available(iOS 16.0, *) {
-            face
-                .contentShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
-                .onTapGesture {
-                    model.selectSubscription(id)
-                    dismiss()
-                }
-                .contextMenu {
-                    deleteMenu(id)
-                } preview: {
-                    face
-                }
-        } else {
-            face
-                .contentShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
-                .onTapGesture {
-                    model.selectSubscription(id)
-                    dismiss()
-                }
-                .contextMenu {
-                    deleteMenu(id)
-                }
-        }
-    }
-
-    /// The group's own delete — the context menu's one ask.
-    private func deleteMenu(_ id: String) -> some View {
-        Button(role: .destructive) {
-            model.deleteSubscription(id)
-            dismiss()
-        } label: {
-            Label("servers.deleteSubscription", systemImage: "trash")
-        }
-    }
-
-    /// The one add row — the dialog's door.
-    private var addRow: some View {
-        Button {
+        .padding(.horizontal, 16)
+        .padding(.vertical, 10)
+        .frame(minHeight: 64)
+        .background(rowFill(isFirst: false, isLast: true, isSelected: false))
+        .contentShape(Rectangle())
+        .onTapGesture {
             dismiss()
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.45) {
                 onAddSubscription()
             }
-        } label: {
-            HStack(spacing: 16) {
-                ZStack {
-                    RoundedRectangle(cornerRadius: 12, style: .continuous)
-                        .fill(Chumpy.secondaryContainer)
-                        .frame(width: 40, height: 40)
-                    Image(systemName: "link.badge.plus")
-                        .font(.system(size: 16, weight: .medium))
-                        .foregroundStyle(Color.accentColor)
-                }
-                Text("servers.add.subscription")
-                    .font(.system(size: 16, weight: .medium))
-                    .foregroundStyle(.primary)
-                Spacer()
-                Image(systemName: "plus")
-                    .font(.system(size: 14, weight: .medium))
-                    .foregroundStyle(Color.secondary)
-            }
-            .padding(16)
-            .frame(minHeight: 72)
-            .background(
-                RoundedRectangle(cornerRadius: 20, style: .continuous)
-                    .fill(.regularMaterial)
-            )
         }
-        .buttonStyle(.plain)
+    }
+
+    /// The row's own paint — the servers list's own law: the native
+    /// frost at rest, the accent's solid plate when standing, the
+    /// layers crossing over the group's corner law.
+    private func rowFill(isFirst: Bool, isLast: Bool, isSelected: Bool) -> some View {
+        ZStack {
+            rowShape(isFirst: isFirst, isLast: isLast).fill(.regularMaterial)
+            rowShape(isFirst: isFirst, isLast: isLast).fill(Chumpy.accent)
+                .opacity(isSelected ? 1 : 0)
+        }
+        .animation(.easeInOut(duration: 0.18), value: isSelected)
+    }
+
+    private func rowShape(isFirst: Bool, isLast: Bool) -> UnevenCornerShape {
+        UnevenCornerShape(
+            topLeft: isFirst ? Chumpy.cardRadius : Chumpy.innerRadius,
+            topRight: isFirst ? Chumpy.cardRadius : Chumpy.innerRadius,
+            bottomLeft: isLast ? Chumpy.cardRadius : Chumpy.innerRadius,
+            bottomRight: isLast ? Chumpy.cardRadius : Chumpy.innerRadius
+        )
     }
 }
