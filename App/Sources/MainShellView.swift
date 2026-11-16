@@ -46,18 +46,36 @@ struct MainShellView: View {
         case home, servers, stats, settings
     }
 
-    /// The bar's whole footprint with its margin — what the content keeps
-    /// clear below its own bottom-anchored runs.
-    private let barReservedHeight: CGFloat = 88
-
     /// The one motion every page change rides: a soft spring.
     private let pageMotion = Animation.spring(response: 0.38, dampingFraction: 0.86)
+
+    /// The bar's own spring — snappier than the page's, so the bar reads
+    /// as its own navigation object, not a part of the page beneath it.
+    private let barMotion = Animation.spring(response: 0.32, dampingFraction: 0.75)
 
     var body: some View {
         ZStack(alignment: .bottom) {
             content
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .padding(.bottom, barReservedHeight)
+
+            // The frosted backdrop under the bar: no hard edge, no empty
+            // zone — the pages flow under it and dissolve into the blur
+            // via a clear-to-solid gradient mask.
+            Rectangle()
+                .fill(.ultraThinMaterial)
+                .frame(height: 150)
+                .mask {
+                    LinearGradient(
+                        stops: [
+                            .init(color: .clear, location: 0.0),
+                            .init(color: .black, location: 1.0)
+                        ],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                }
+                .allowsHitTesting(false)
+                .ignoresSafeArea(edges: .bottom)
 
             bar
                 .padding(.horizontal, 16)
@@ -88,10 +106,10 @@ struct MainShellView: View {
         }
     }
 
-    /// The pages trade places behind a crossfade with a whisper of lift —
-    /// no sliding stacks, the shell itself never moves.
+    /// The pages trade places behind a plain crossfade — the shell itself
+    /// never moves, never scales.
     private var pageTransition: AnyTransition {
-        .opacity.combined(with: .scale(scale: 0.985))
+        .opacity
     }
 
     private func openTab(_ tab: Tab) {
@@ -124,39 +142,39 @@ struct MainShellView: View {
         .chumpyGlassCapsule()
         .clipShape(Capsule())
         .chumpyPillEdge()
-        .animation(pageMotion, value: page)
+        .animation(barMotion, value: page)
     }
 
     private func tabItem(_ tab: Tab) -> some View {
         let isSelected = page == Page(tab: tab)
 
+        // One live layout, no branch swap: the label unfolds out of the
+        // icon — its width and opacity ride the spring, so the pill reads
+        // as one object gliding between slots.
         return Button {
             openTab(tab)
         } label: {
-            Group {
+            HStack(spacing: 0) {
+                Image(systemName: isSelected ? tab.activeIcon : tab.icon)
+                    .font(.system(size: 17, weight: .medium))
+                Text(tab.titleKey)
+                    .font(.system(size: 14, weight: .medium))
+                    .lineLimit(1)
+                    .fixedSize()
+                    .frame(width: isSelected ? nil : 0)
+                    .opacity(isSelected ? 1 : 0)
+                    .padding(.leading, isSelected ? 5 : 0)
+            }
+            .padding(.horizontal, isSelected ? 16 : 14)
+            .frame(minWidth: 44, minHeight: 48)
+            .background {
                 if isSelected {
-                    HStack(spacing: 4) {
-                        Image(systemName: tab.activeIcon)
-                            .font(.system(size: 17, weight: .medium))
-                        Text(tab.titleKey)
-                            .font(.system(size: 14, weight: .medium))
-                            .lineLimit(1)
-                    }
-                    .padding(.horizontal, 16)
-                    .frame(height: 48)
-                    .background {
-                        Capsule()
-                            .fill(Chumpy.secondaryContainer)
-                            .matchedGeometryEffect(id: "tab-indicator", in: tabNamespace)
-                    }
-                    .foregroundStyle(Color.accentColor)
-                } else {
-                    Image(systemName: tab.icon)
-                        .font(.system(size: 17, weight: .medium))
-                        .frame(width: 48, height: 48)
-                        .foregroundStyle(Color.secondary)
+                    Capsule()
+                        .fill(Chumpy.secondaryContainer)
+                        .matchedGeometryEffect(id: "tab-indicator", in: tabNamespace)
                 }
             }
+            .foregroundStyle(isSelected ? Color.accentColor : Color.secondary)
         }
         .buttonStyle(.plain)
     }
@@ -184,7 +202,7 @@ struct MainShellView: View {
         .chumpyGlassCapsule()
         .clipShape(Circle())
         .chumpyPillEdge()
-        .animation(pageMotion, value: page)
+        .animation(barMotion, value: page)
     }
 }
 

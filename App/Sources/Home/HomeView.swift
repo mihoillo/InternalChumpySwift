@@ -55,6 +55,7 @@ struct HomeView: View {
             connectButton
         }
         .padding(.horizontal, 20)
+        .padding(.bottom, 88)
         .onReceive(ticker) { now = $0 }
         .onAppear { startLiveDelayIfUp() }
         .onChange(of: appState.status) { _ in startLiveDelayIfUp() }

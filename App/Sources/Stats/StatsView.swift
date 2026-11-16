@@ -29,7 +29,7 @@ struct StatsView: View {
                 }
                 .padding(.horizontal, 16)
                 .padding(.top, 8)
-                .padding(.bottom, 16)
+                .padding(.bottom, 104)
             }
             .navigationTitle("tab.stats")
             .navigationBarTitleDisplayMode(.inline)

@@ -71,7 +71,7 @@ struct ServersView: View {
             }
             .padding(.horizontal, 16)
             .padding(.top, 8)
-            .padding(.bottom, 16)
+            .padding(.bottom, 104)
         }
     }
 
@@ -154,10 +154,13 @@ struct ServersView: View {
     // MARK: - Rows
 
     private var rows: some View {
-        VStack(spacing: 2) {
-            ForEach(model.profiles) { profile in
+        let total = model.profiles.count
+        return VStack(spacing: 2) {
+            ForEach(Array(model.profiles.enumerated()), id: \.element.id) { index, profile in
                 ServerGroupRow(
                     profile: profile,
+                    isFirst: index == 0,
+                    isLast: index == total - 1,
                     isSelected: isSelected(profile),
                     tunnelUp: appState.status == .connected || appState.status == .reasserting,
                     onSelect: { select(profile) },
@@ -391,6 +394,8 @@ private struct SubscriptionCard: View {
 /// Android client's `ServerGroupRow` / `ServerRow`.
 private struct ServerGroupRow: View {
     let profile: Profile
+    let isFirst: Bool
+    let isLast: Bool
     let isSelected: Bool
     let tunnelUp: Bool
     var onSelect: () -> Void
@@ -420,11 +425,16 @@ private struct ServerGroupRow: View {
     }
 
     /// The row's own paint, riding behind the content as its background —
-    /// a plain square-cut plate, the way the user wears the list.
+    /// the group's outer 28pt / inner 4pt corner law.
     private var rowFill: some View {
-        Rectangle()
-            .fill(isSelected ? Chumpy.primaryContainer : Chumpy.surfaceContainer)
-            .animation(.easeInOut(duration: 0.18), value: isSelected)
+        UnevenCornerShape(
+            topLeft: isFirst ? Chumpy.cardRadius : Chumpy.innerRadius,
+            topRight: isFirst ? Chumpy.cardRadius : Chumpy.innerRadius,
+            bottomLeft: isLast ? Chumpy.cardRadius : Chumpy.innerRadius,
+            bottomRight: isLast ? Chumpy.cardRadius : Chumpy.innerRadius
+        )
+        .fill(isSelected ? Chumpy.primaryContainer : Chumpy.surfaceContainer)
+        .animation(.easeInOut(duration: 0.18), value: isSelected)
     }
 
     private var rowContent: some View {
@@ -470,12 +480,12 @@ private struct ServerGroupRow: View {
         }
     }
 
-    /// The round 40pt tile: tonal, the accent's own fill when picked — the
-    /// flag rides the slot, names without one keep the globe, balancers
-    /// keep the explore compass.
+    /// The square 40pt tile with a 10pt corner: tonal, the accent's own
+    /// fill when picked — the flag rides the slot, names without one keep
+    /// the globe, balancers keep the explore compass.
     private var tile: some View {
         ZStack {
-            Circle()
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
                 .fill(isSelected ? Chumpy.accent : Chumpy.secondaryContainer)
                 .frame(width: 40, height: 40)
             if let flag = leadingFlagEmoji {
