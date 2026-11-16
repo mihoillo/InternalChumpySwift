@@ -154,13 +154,10 @@ struct ServersView: View {
     // MARK: - Rows
 
     private var rows: some View {
-        let total = model.profiles.count
-        return VStack(spacing: 2) {
-            ForEach(Array(model.profiles.enumerated()), id: \.element.id) { index, profile in
+        VStack(spacing: 2) {
+            ForEach(model.profiles) { profile in
                 ServerGroupRow(
                     profile: profile,
-                    isFirst: index == 0,
-                    isLast: index == total - 1,
                     isSelected: isSelected(profile),
                     tunnelUp: appState.status == .connected || appState.status == .reasserting,
                     onSelect: { select(profile) },
@@ -394,8 +391,6 @@ private struct SubscriptionCard: View {
 /// Android client's `ServerGroupRow` / `ServerRow`.
 private struct ServerGroupRow: View {
     let profile: Profile
-    let isFirst: Bool
-    let isLast: Bool
     let isSelected: Bool
     let tunnelUp: Bool
     var onSelect: () -> Void
@@ -425,16 +420,11 @@ private struct ServerGroupRow: View {
     }
 
     /// The row's own paint, riding behind the content as its background —
-    /// it sizes to the row, not to some collapsed proposal.
+    /// a plain square-cut plate, the way the user wears the list.
     private var rowFill: some View {
-        UnevenCornerShape(
-            topLeft: isFirst ? Chumpy.cardRadius : Chumpy.innerRadius,
-            topRight: isFirst ? Chumpy.cardRadius : Chumpy.innerRadius,
-            bottomLeft: isLast ? Chumpy.cardRadius : Chumpy.innerRadius,
-            bottomRight: isLast ? Chumpy.cardRadius : Chumpy.innerRadius
-        )
-        .fill(isSelected ? Chumpy.primaryContainer : Chumpy.surfaceContainer)
-        .animation(.easeInOut(duration: 0.18), value: isSelected)
+        Rectangle()
+            .fill(isSelected ? Chumpy.primaryContainer : Chumpy.surfaceContainer)
+            .animation(.easeInOut(duration: 0.18), value: isSelected)
     }
 
     private var rowContent: some View {
@@ -444,12 +434,12 @@ private struct ServerGroupRow: View {
             VStack(alignment: .leading, spacing: 3) {
                 HStack(alignment: .firstTextBaseline, spacing: 0) {
                     Text(title)
-                        .font(.system(size: 17, weight: .semibold))
+                        .font(.system(size: 16, weight: .medium))
                         .lineLimit(1)
                         .truncationMode(.middle)
                     if let pingText {
                         Text("  ·  \(pingText)")
-                            .font(.system(size: 14))
+                            .font(.system(size: 13))
                             .lineLimit(1)
                             .foregroundStyle(pingColor)
                     }
@@ -470,8 +460,8 @@ private struct ServerGroupRow: View {
             }
         }
         .padding(.horizontal, 16)
-        .padding(.vertical, 14)
-        .frame(minHeight: 80)
+        .padding(.vertical, 10)
+        .frame(minHeight: 64)
         .contentShape(Rectangle())
         .onTapGesture {
             // A concealed row stands where it always stood but stays out
@@ -480,24 +470,24 @@ private struct ServerGroupRow: View {
         }
     }
 
-    /// The round 44pt tile: tonal, the accent's own fill when picked — the
+    /// The round 40pt tile: tonal, the accent's own fill when picked — the
     /// flag rides the slot, names without one keep the globe, balancers
     /// keep the explore compass.
     private var tile: some View {
         ZStack {
             Circle()
                 .fill(isSelected ? Chumpy.accent : Chumpy.secondaryContainer)
-                .frame(width: 44, height: 44)
+                .frame(width: 40, height: 40)
             if let flag = leadingFlagEmoji {
                 Text(flag)
-                    .font(.system(size: 22))
+                    .font(.system(size: 20))
             } else if profile.type == .balancer {
                 Image(systemName: "safari")
-                    .font(.system(size: 18, weight: .medium))
+                    .font(.system(size: 16, weight: .medium))
                     .foregroundStyle(isSelected ? Color.white : Color.accentColor)
             } else {
                 Image(systemName: "globe")
-                    .font(.system(size: 18, weight: .regular))
+                    .font(.system(size: 16, weight: .regular))
                     .foregroundStyle(isSelected ? Color.white : Color.accentColor)
             }
         }
