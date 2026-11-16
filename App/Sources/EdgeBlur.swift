@@ -17,8 +17,8 @@ import UIKit
 // carries are swapped for CAFilter's "variableBlur", fed a hand-drawn
 // gradient mask — the blur radius at every point follows the mask, and
 // content really blurs progressively. If the private filter can't be
-// reached on some system, the view degrades to the masked material (the
-// translucent gradient) rather than to nothing.
+// reached on some system, the band hides — no flat gradient stands in
+// and fakes it.
 
 struct EdgeBlur: UIViewRepresentable {
     /// The screen edge the blur hugs — and where it is at full strength.
@@ -74,11 +74,6 @@ final class ProgressiveBlurView: UIView {
 
     /// The band length the current ramp was built for.
     private var rampLength: Int = 0
-
-    /// The degraded paint, mounted only on systems where the private
-    /// filter can't be built: the whole material faded by a gradient mask —
-    /// translucent, not blurring, but present.
-    private let fallbackMask = CAGradientLayer()
 
     init(edge: EdgeBlur.Edge) {
         self.edge = edge
@@ -139,12 +134,6 @@ final class ProgressiveBlurView: UIView {
 
         guard window != nil, bounds.width > 0, bounds.height > 0 else { return }
 
-        // The fallback mask, if it ever mounts, tracks the band by hand.
-        CATransaction.begin()
-        CATransaction.setDisableActions(true)
-        fallbackMask.frame = blurView.bounds
-        CATransaction.commit()
-
         let length = Int(bounds.height.rounded(.up))
         if length != rampLength {
             rampLength = length
@@ -157,7 +146,7 @@ final class ProgressiveBlurView: UIView {
     // MARK: - The filter
 
     /// Puts the variable-blur filter on the effect view's backdrop layer —
-    /// or, where it can't be built, the masked-material fallback.
+    /// or, where it can't be built, hides the band until a later pass.
     private func installBlurFilter() {
         // The backdrop is cached weakly and re-looked-up whenever UIKit has
         // rebuilt the internals.
@@ -166,18 +155,27 @@ final class ProgressiveBlurView: UIView {
         }
 
         guard needsRebuild || !oursIsInstalled else {
-            fadeMaterialPaint(ours: true)
+            blurView.isHidden = UIAccessibility.isReduceTransparencyEnabled
+            fadeMaterialPaint()
             return
         }
         guard let backdropView, let rampImage else { return }
 
+        // The system's filter class is learned from the live backdrop's own
+        // filters — a layer that is actually rendering, not a throwaway
+        // probe that may carry nothing yet.
+        if Self.filterFactory == nil {
+            Self.learnFilterFactory(from: backdropView)
+        }
+
         guard let filter = Self.makeVariableBlurFilter(mask: rampImage, radius: fullRadius) else {
-            mountFallbackMask()
-            fadeMaterialPaint(ours: false)
+            // The private filter is unreachable — no flat gradient stands
+            // in and fakes it: the band hides, and the pass keeps the
+            // rebuild pending so a later layout retries.
+            blurView.isHidden = true
             return
         }
 
-        blurView.layer.mask = nil
         backdropView.layer.filters = [filter]
         // The backdrop's capture resolution. At the default the pass-through
         // end of the ramp shows a coarse, misaligned copy of the content
@@ -187,7 +185,8 @@ final class ProgressiveBlurView: UIView {
         backdropView.layer.setValue(window?.screen.scale ?? 1.0, forKey: "scale")
         installedFilter = filter
         needsRebuild = false
-        fadeMaterialPaint(ours: true)
+        blurView.isHidden = UIAccessibility.isReduceTransparencyEnabled
+        fadeMaterialPaint()
     }
 
     /// Whether the filter on the backdrop layer is still ours — UIKit puts
@@ -198,48 +197,36 @@ final class ProgressiveBlurView: UIView {
 
     /// While the variable blur is ours, the material's own paint — tint,
     /// vibrancy, whatever else the system layers on — is a haze over clean
-    /// frost: every subview but the backdrop is faded out, and brought
-    /// back whenever ours is off.
-    private func fadeMaterialPaint(ours: Bool) {
+    /// frost: every subview but the backdrop is faded out.
+    private func fadeMaterialPaint() {
         for subview in blurView.subviews where subview !== backdropView {
-            subview.alpha = ours ? 0 : 1
+            subview.alpha = 0
         }
-    }
-
-    /// The degraded paint. Retried only when a new window or a trait change
-    /// asks for a layout anyway.
-    private func mountFallbackMask() {
-        needsRebuild = false
-        guard blurView.layer.mask == nil else { return }
-
-        // White at the strong edge, clear at the fade end — the mask keeps
-        // what survives of the composite.
-        fallbackMask.colors = [UIColor.clear.cgColor, UIColor.white.cgColor]
-        switch edge {
-        case .top:
-            fallbackMask.startPoint = CGPoint(x: 0.5, y: 1)
-            fallbackMask.endPoint = CGPoint(x: 0.5, y: 0)
-        case .bottom:
-            fallbackMask.startPoint = CGPoint(x: 0.5, y: 0)
-            fallbackMask.endPoint = CGPoint(x: 0.5, y: 1)
-        }
-        blurView.layer.mask = fallbackMask
     }
 
     // MARK: - The system's filters
 
-    /// The system's filter factory, discovered once from a throwaway effect
-    /// view. A nil discovery leaves it unset, and the next pass retries.
+    /// The system's filter factory, learned from the live backdrop's own
+    /// filters. A nil leaves it unset, and the next pass retries.
     private static var filterFactory: ((String) -> NSObject?)?
 
     /// Builds CAFilter's "variableBlur" — the filter the platform's own
     /// progressive blurs are made of. CAFilter is not public, but a live
     /// backdrop hands out its class, and the class builds new filters by
     /// name.
-    private static func makeVariableBlurFilter(mask: CGImage, radius: CGFloat) -> NSObject? {
-        if filterFactory == nil {
-            discoverFilterFactory()
+    private static func learnFilterFactory(from backdropView: UIView) {
+        guard let appleFilter = backdropView.layer.filters?.first as? NSObject else { return }
+
+        let filterClass = type(of: appleFilter)
+        let build = NSSelectorFromString("filterWithType:")
+        guard filterClass.responds(to: build) else { return }
+
+        filterFactory = { name in
+            (filterClass as AnyObject).perform(build, with: name)?.takeUnretainedValue() as? NSObject
         }
+    }
+
+    private static func makeVariableBlurFilter(mask: CGImage, radius: CGFloat) -> NSObject? {
         guard let filter = filterFactory?("variableBlur") else { return nil }
 
         // The ramp drives the radius point by point; the edges are
@@ -248,22 +235,6 @@ final class ProgressiveBlurView: UIView {
         filter.setValue(radius, forKey: "inputRadius")
         filter.setValue(true, forKey: "inputNormalizeEdges")
         return filter
-    }
-
-    private static func discoverFilterFactory() {
-        // A throwaway effect view carries the filters already, window or
-        // not — its backdrop layer is enough to learn the class.
-        let probe = UIVisualEffectView(effect: UIBlurEffect(style: .regular))
-        guard let backdrop = internalSubview(of: probe, called: "backdrop"),
-              let filter = backdrop.layer.filters?.first as? NSObject else { return }
-
-        let filterClass = type(of: filter)
-        let build = NSSelectorFromString("filterWithType:")
-        guard filterClass.responds(to: build) else { return }
-
-        filterFactory = { name in
-            (filterClass as AnyObject).perform(build, with: name)?.takeUnretainedValue() as? NSObject
-        }
     }
 
     /// The internal subview whose class name contains the given string —

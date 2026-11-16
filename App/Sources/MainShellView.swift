@@ -63,26 +63,28 @@ struct MainShellView: View {
             content
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
 
-            // The frosted backdrop under the bar: no hard edge, no empty
-            // zone — the pages flow under it and dissolve into a real
-            // blur that gains strength towards the screen's bottom. Home
-            // never scrolls and holds its ground clear, same as up top.
+            // The frost at the screen's edges: the pages flow under it and
+            // dissolve into a real blur that gains strength towards each
+            // edge — anchored at the physical frame, past the safe areas,
+            // under the status bar and the home indicator alike. The plain
+            // frame sizes each band, the background carries it into the
+            // unsafe zones, and the outer frame pins it to its own edge —
+            // the ZStack's bottom alignment must not drag the top band
+            // down onto the bar. Home never scrolls and holds its ground
+            // clear.
             if page != .home {
-                EdgeBlur(edge: .bottom)
-                    .frame(height: bottomBlurHeight)
-                    .allowsHitTesting(false)
-                    .ignoresSafeArea(edges: .bottom)
-                    .transition(.opacity)
-            }
-
-            // The mirror up top — the scrolling pages wear the same
-            // dissolve under their navigation bars. Home never scrolls
-            // and holds the greeting right there, so it stays clear.
-            if page != .home {
-                EdgeBlur(edge: .top)
+                Color.clear
                     .frame(height: topBlurHeight)
+                    .background(EdgeBlur(edge: .top).ignoresSafeArea(edges: .top))
                     .allowsHitTesting(false)
-                    .ignoresSafeArea(edges: .top)
+                    .frame(maxHeight: .infinity, alignment: .top)
+                    .transition(.opacity)
+
+                Color.clear
+                    .frame(height: bottomBlurHeight)
+                    .background(EdgeBlur(edge: .bottom).ignoresSafeArea(edges: .bottom))
+                    .allowsHitTesting(false)
+                    .frame(maxHeight: .infinity, alignment: .bottom)
                     .transition(.opacity)
             }
 
