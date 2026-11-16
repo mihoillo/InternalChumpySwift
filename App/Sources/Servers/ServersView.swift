@@ -45,10 +45,8 @@ struct ServersView: View {
     // MARK: - List
 
     private var list: some View {
-        EdgeScrollView {
+        EdgeScrollView(tag: "servers") {
             VStack(spacing: 12) {
-                PageLargeTitle(titleKey: "tab.servers")
-
                 if let error = model.error {
                     ErrorCard(message: error)
                 }
@@ -192,7 +190,6 @@ struct ServersView: View {
 
     private var emptyState: some View {
         VStack(spacing: 14) {
-            PageLargeTitle(titleKey: "tab.servers")
             Spacer()
             Image(systemName: "square.stack.3d.up.slash")
                 .font(.system(size: 44))
@@ -224,7 +221,7 @@ struct ServersView: View {
         // The empty page doesn't scroll, so it speaks the metrics itself:
         // no travel, nothing below the fold — both frosts stay asleep.
         .onAppear {
-            ScrollReporter.shared.metrics = ScrollMetrics()
+            ScrollReporter.shared.metrics = ScrollMetrics(tag: "servers")
         }
     }
 }

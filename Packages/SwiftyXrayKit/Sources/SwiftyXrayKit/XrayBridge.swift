@@ -184,7 +184,6 @@ public final class XrayBridge {
     ) throws {
         let data = try JSONSerialization.data(withJSONObject: dict, options: .prettyPrinted)
         let json = String(decoding: data, as: UTF8.self)
-        traceHandle?("###XrayBridge final config: \(json)")
         try json.write(to: finalConfigPath, atomically: true, encoding: .utf8)
         try SwiftyXray.run(dataDir: dataDir.path, configPath: finalConfigPath.path, traceHandle: traceHandle)
         isRunning = true

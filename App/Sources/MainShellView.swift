@@ -59,10 +59,10 @@ struct MainShellView: View {
     /// of the page beneath it.
     private let barMotion = Animation.spring(response: 0.34, dampingFraction: 0.72)
 
-    /// How tall the frost runs from the bar's edge — the bar's own
-    /// height plus its lift, so the dissolve starts with the bar and not
-    /// far above it.
-    private let bottomBlurHeight: CGFloat = 88
+    /// How tall the frost runs from the bar's edge — exactly the bar's
+    /// own zone: its height plus its lift above the home indicator, so
+    /// the dissolve is the bar's, nothing more.
+    private let bottomBlurHeight: CGFloat = 76
 
     /// How far the page must travel for a frost to commit or hold: the
     /// header frost is fully on after this much scroll, the bar frost
@@ -71,14 +71,26 @@ struct MainShellView: View {
 
     // MARK: - The scroll's word on the frost
 
-    /// How far the page has traveled from its start.
+    /// The live page's tag — the only scroll the shell heeds. The pager
+    /// keeps every page alive; each one's scroll speaks for itself,
+    /// tagged.
+    private var activeTag: String {
+        switch page {
+        case .home: return "home"
+        case .servers: return "servers"
+        case .stats: return "stats"
+        case .settings: return "settings"
+        }
+    }
+
+    /// How far the live page has traveled from its start.
     private var scrolled: CGFloat {
-        scrollReporter.metrics.scrolled
+        scrollReporter.metrics.tag == activeTag ? scrollReporter.metrics.scrolled : 0
     }
 
     /// How much content still waits below the fold — zero at the end.
     private var belowFold: CGFloat {
-        scrollReporter.metrics.belowFold
+        scrollReporter.metrics.tag == activeTag ? scrollReporter.metrics.belowFold : 0
     }
 
     /// The header frost's strength: off at the start, committed once the
@@ -93,7 +105,7 @@ struct MainShellView: View {
         min(1, belowFold / blurCommitDistance)
     }
 
-    /// The live page's name — the header's small centered title.
+    /// The live page's name — the header title's text.
     private var pageTitleKey: LocalizedStringKey {
         switch page {
         case .home: return "tab.home"
@@ -103,40 +115,31 @@ struct MainShellView: View {
         }
     }
 
-    /// TEMPORARY — the scroll's pulse, on screen while the frost is
-    /// being tuned: it tells a dead reporter from a deaf blur in one
-    /// glance. Goes away once the frost is settled.
-    private var debugLine: String {
-        String(
-            format: "s %.0f  b %.0f  T %.2f  B %.2f",
-            scrolled, belowFold, topStrength, bottomStrength
-        )
-    }
-
     var body: some View {
         ZStack(alignment: .bottom) {
-            content
+            pager
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
 
             // The frost at the screen's edges, run by the scroll. The
-            // pages carry their own large title in the content; the header
-            // strip up here is its folded state — the small centered
-            // title over the header frost, both waking together as the
-            // page leaves its start. The bar frost sleeps again once the
-            // page reaches its end. Both are anchored at the physical
-            // frame, past the safe areas, under the status bar and the
-            // home indicator alike; the plain frame sizes each band, the
-            // background carries it into the unsafe zones, and the outer
-            // frame pins it to its own edge. Home never scrolls and holds
-            // its ground clear.
+            // header strip carries the page's title through both its
+            // lives — large and leading where the page's content begins,
+            // folded small and centered into the strip once the page
+            // scrolls, the same fold that wakes the frost. The bar frost
+            // sleeps again once the page reaches its end. Both are
+            // anchored at the physical frame, past the safe areas, under
+            // the status bar and the home indicator alike; the plain
+            // frame sizes each band, the background carries it into the
+            // unsafe zones, and the outer frame pins it to its own edge.
+            // Home never scrolls and holds its ground clear.
             if page != .home {
                 Color.clear
                     .frame(height: chumpyHeaderHeight)
                     .overlay(
-                        Text(pageTitleKey)
-                            .font(.system(size: 17, weight: .semibold))
-                            .lineLimit(1)
-                            .opacity(topStrength)
+                        MorphingPageTitle(
+                            titleKey: pageTitleKey,
+                            fold: topStrength,
+                            scrolled: scrolled
+                        )
                     )
                     .background(EdgeBlur(edge: .top, strength: topStrength).ignoresSafeArea(edges: .top))
                     .allowsHitTesting(false)
@@ -151,17 +154,6 @@ struct MainShellView: View {
                     .transition(.opacity)
             }
 
-            // TEMPORARY — the scroll's pulse, see debugLine. Tiny,
-            // dead to touches, gone in the commit after the frost is
-            // settled.
-            Text(debugLine)
-                .font(.system(size: 10, design: .monospaced))
-                .foregroundStyle(.secondary)
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-                .padding(.leading, 4)
-                .padding(.top, 2)
-                .allowsHitTesting(false)
-
             bar
                 .padding(.horizontal, 16)
                 .padding(.bottom, 12)
@@ -170,39 +162,28 @@ struct MainShellView: View {
         .ignoresSafeArea(.keyboard, edges: .bottom)
     }
 
-    @ViewBuilder
-    private var content: some View {
-        ZStack {
-            switch page {
-            case .home:
-                HomeView {
-                    openTab(.servers)
-                }
-                .transition(pageTransition)
-            case .servers:
-                ServersView()
-                    .transition(pageTransition)
-            case .stats:
-                StatsView()
-                    .transition(pageTransition)
-            case .settings:
-                SettingsView()
-                    .transition(pageTransition)
-            }
+    /// The pages as a deck: a swipe slides one page over the next, and
+    /// the bar's buttons deal the same deck — every switch rides the
+    /// slide, no crossfade. The pages keep their state between deals;
+    /// each one's scroll speaks for itself, tagged.
+    private var pager: some View {
+        TabView(selection: $page) {
+            HomeView { openTab(.servers) }
+                .tag(Page.home)
+            ServersView()
+                .tag(Page.servers)
+            StatsView()
+                .tag(Page.stats)
+            SettingsView()
+                .tag(Page.settings)
         }
-    }
-
-    /// The pages trade places behind a plain crossfade — the shell itself
-    /// never moves, never scales.
-    private var pageTransition: AnyTransition {
-        .opacity
+        .tabViewStyle(.page(indexDisplayMode: .never))
     }
 
     private func openTab(_ tab: Tab) {
         withAnimation(barMotion) {
             page = Page(tab: tab)
             lastTab = tab
-            scrollReporter.metrics = ScrollMetrics()
         }
     }
 
@@ -229,6 +210,9 @@ struct MainShellView: View {
         .chumpyGlassCapsule()
         .clipShape(Capsule())
         .chumpyPillEdge()
+        // A swipe deals the deck without a button — the indicator must
+        // ride the same spring anyway.
+        .animation(barMotion, value: page)
     }
 
     private func tabItem(_ tab: Tab) -> some View {
@@ -280,7 +264,6 @@ struct MainShellView: View {
         return Button {
             withAnimation(barMotion) {
                 page = onSettings ? Page(tab: lastTab) : .settings
-                scrollReporter.metrics = ScrollMetrics()
             }
         } label: {
             Image(systemName: "gearshape.fill")
@@ -333,6 +316,63 @@ private struct BarPressStyle: ButtonStyle {
         configuration.label
             .scaleEffect(configuration.isPressed ? 0.90 : 1)
             .animation(.spring(response: 0.25, dampingFraction: 0.55), value: configuration.isPressed)
+    }
+}
+
+/// The page's title, one view living both its lives: large and leading
+/// where the page's content begins, folded small and centered into the
+/// header strip once the page scrolls. The fold (0…1) carries the whole
+/// trip — the type shrinks from the large 34 to the header's 17, the
+/// position slides from the content's title spot into the strip's
+/// center. No fade: the title travels.
+private struct MorphingPageTitle: View {
+    let titleKey: LocalizedStringKey
+    /// 0 — large, at rest in the content; 1 — folded into the header.
+    let fold: CGFloat
+    /// How far the page has traveled — the title starts at content
+    /// speed and the fold gathers the rest of the way.
+    let scrolled: CGFloat
+
+    /// The title's measured width — the leading rest position needs it.
+    @State private var textWidth: CGFloat = 0
+
+    private var fontSize: CGFloat {
+        34 - 17 * fold
+    }
+
+    var body: some View {
+        GeometryReader { geo in
+            Text(titleKey)
+                .font(.system(size: fontSize, weight: fold > 0.5 ? .semibold : .bold))
+                .lineLimit(1)
+                .fixedSize()
+                .background(
+                    GeometryReader { text in
+                        Color.clear
+                            .onAppear { textWidth = text.size.width }
+                            .onChange(of: text.size.width) { textWidth = $0 }
+                    }
+                )
+                .position(x: xPosition(in: geo.size.width), y: yPosition)
+        }
+    }
+
+    /// Leading at rest, centered in the strip once folded.
+    private func xPosition(in width: CGFloat) -> CGFloat {
+        let leading = 16 + textWidth / 2
+        let centered = width / 2
+        return leading + (centered - leading) * fold
+    }
+
+    /// The title's center: at rest it sits in the content's title spot —
+    /// below the strip, where the pages pad their content; folded it
+    /// sits in the strip's middle. The scroll carries it while it can,
+    /// the fold gathers the rest.
+    private var yPosition: CGFloat {
+        let rest = chumpyHeaderHeight + 8 + 17
+        let folded = chumpyHeaderHeight / 2
+        let traveling = rest - scrolled
+        return traveling + (folded - traveling) * fold
     }
 }
 

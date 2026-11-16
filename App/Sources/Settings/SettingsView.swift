@@ -17,10 +17,8 @@ struct SettingsView: View {
     ) private var testURL: String = "https://www.gstatic.com/generate_204"
 
     var body: some View {
-        EdgeScrollView {
+        EdgeScrollView(tag: "settings") {
             VStack(spacing: 12) {
-                PageLargeTitle(titleKey: "tab.settings")
-
                 connectionCard
                 tunnelCard
                 aboutCard

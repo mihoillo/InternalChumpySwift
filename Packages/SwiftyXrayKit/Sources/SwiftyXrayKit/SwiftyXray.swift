@@ -65,7 +65,6 @@ public class SwiftyXray {
   public static func run(dataDir: String, configPath: String, traceHandle: ((String) -> Void)? = nil) throws {
     let jsonRequest = try JSONEncoder().encode(XRayRunRequest(datDir: dataDir, configPath: configPath))
 
-    traceHandle?("###SwiftyXray request: \(jsonRequest)")
     let base64JsonResponse = LibXrayRunXray(jsonRequest.base64EncodedString())
 
     traceHandle?("###SwiftyXray file path: \(configPath)")

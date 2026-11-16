@@ -45,6 +45,9 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
         }
 
         ChumpyConstant.ensureDirectories()
+        // A tunnel session starts with a clean slate — the log is this
+        // session's story, not a mountain of the last ones.
+        ChumpyLog.shared.clear()
         ChumpyLog.shared.append("tunnel starting…")
         let profileName = defaults.string(forKey: ChumpyConstant.Keys.tunnelProfileName) ?? "—"
 

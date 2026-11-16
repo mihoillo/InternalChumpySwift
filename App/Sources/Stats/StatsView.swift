@@ -12,10 +12,8 @@ struct StatsView: View {
     private let ticker = Timer.publish(every: 1.5, on: .main, in: .common).autoconnect()
 
     var body: some View {
-        EdgeScrollView {
+        EdgeScrollView(tag: "stats") {
             VStack(spacing: 12) {
-                PageLargeTitle(titleKey: "tab.stats")
-
                 WeekTrafficCard(week: week)
 
                 ChartHeader(icon: "arrow.down.circle", title: "stats.trafficTotal")
@@ -70,6 +68,9 @@ struct StatsView: View {
                         Text(line)
                             .font(.system(size: 11, design: .monospaced))
                             .textSelection(.enabled)
+                            // Long lines wrap, the way a log reads —
+                            // never a clipped tail.
+                            .fixedSize(horizontal: false, vertical: true)
                             .frame(maxWidth: .infinity, alignment: .leading)
                     }
                 }

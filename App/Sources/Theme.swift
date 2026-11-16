@@ -393,28 +393,32 @@ extension View {
     }
 }
 
-// MARK: - Edge scroll & the page's large title
+// MARK: - Edge scroll
 
-/// The collapsing header's strip height — the small centered title's
-/// home. The pages pad their scroll content down by it, so the large
-/// title starts below the strip and scrolls under it.
+/// The collapsing header's strip height — the folded title's home. The
+/// pages pad their scroll content down by it, so the shell's title has
+/// its large resting spot below the strip and the content scrolls
+/// under it.
 let chumpyHeaderHeight: CGFloat = 44
 
-/// The scroll's word on the frost: how far the page has traveled, and
-/// how much content still waits below the fold.
+/// The scroll's word on the frost: whose scroll is speaking, how far
+/// the page has traveled, and how much content still waits below the
+/// fold. The tag tells the pages apart — the pager keeps every page
+/// alive, and the shell heeds only the one it stands on.
 struct ScrollMetrics: Equatable {
+    var tag: String
     var scrolled: CGFloat = 0
     var belowFold: CGFloat = 0
 }
 
-/// The live page's scroll, reported to the shell. The spy inside
-/// `EdgeScrollView` writes here straight from the real UIScrollView —
-/// KVO on the live object, immune to SwiftUI's scroll-view internals.
-/// A singleton: the app has one shell, one live page at a time.
+/// The live page's scroll, reported to the shell. The pages'
+/// EdgeScrollViews write here — the system's own geometry word on
+/// iOS 18+, a KVO spy on the real UIScrollView below. A singleton:
+/// the app has one shell, one live page at a time.
 final class ScrollReporter: ObservableObject {
     static let shared = ScrollReporter()
 
-    @Published var metrics = ScrollMetrics()
+    @Published var metrics = ScrollMetrics(tag: "")
 }
 
 /// A ScrollView that reports its travel to the shell's reporter. On
@@ -424,6 +428,9 @@ final class ScrollReporter: ObservableObject {
 /// watches its offset — the one source that never lies about the
 /// scroll.
 struct EdgeScrollView<Content: View>: View {
+    /// The page this scroll speaks for — the shell heeds only the
+    /// page it stands on.
+    let tag: String
     @ObservedObject private var reporter = ScrollReporter.shared
 
     @ViewBuilder var content: () -> Content
@@ -452,6 +459,7 @@ struct EdgeScrollView<Content: View>: View {
             // points traveled from the start, zero-based.
             let scrolled = max(0, geo.contentOffset.y + geo.contentInsets.top)
             return ScrollMetrics(
+                tag: tag,
                 scrolled: scrolled,
                 belowFold: max(0, geo.contentSize.height - scrolled - geo.containerSize.height)
             )
@@ -464,7 +472,7 @@ struct EdgeScrollView<Content: View>: View {
     private var legacyScrollView: some View {
         ScrollView {
             content()
-                .background(ScrollOffsetSpy(reporter: reporter))
+                .background(ScrollOffsetSpy(reporter: reporter, tag: tag))
         }
     }
 }
@@ -475,9 +483,10 @@ struct EdgeScrollView<Content: View>: View {
 /// scroll views — the UIScrollView never does.
 private struct ScrollOffsetSpy: UIViewRepresentable {
     let reporter: ScrollReporter
+    let tag: String
 
     func makeUIView(context: Context) -> ScrollOffsetSpyView {
-        ScrollOffsetSpyView(reporter: reporter)
+        ScrollOffsetSpyView(reporter: reporter, tag: tag)
     }
 
     func updateUIView(_ view: ScrollOffsetSpyView, context: Context) {}
@@ -485,11 +494,13 @@ private struct ScrollOffsetSpy: UIViewRepresentable {
 
 private final class ScrollOffsetSpyView: UIView {
     private let reporter: ScrollReporter
+    private let tag: String
     private var scrollView: UIScrollView?
     private var observations: [NSKeyValueObservation] = []
 
-    init(reporter: ScrollReporter) {
+    init(reporter: ScrollReporter, tag: String) {
         self.reporter = reporter
+        self.tag = tag
         super.init(frame: .zero)
         isUserInteractionEnabled = false
     }
@@ -548,21 +559,10 @@ private final class ScrollOffsetSpyView: UIView {
         // reads as points traveled from the start, zero-based.
         let scrolled = max(0, scroll.contentOffset.y + scroll.adjustedContentInset.top)
         reporter.metrics = ScrollMetrics(
+            tag: tag,
             scrolled: scrolled,
             belowFold: max(0, scroll.contentSize.height - scrolled - scroll.bounds.height)
         )
     }
 }
 
-/// The page's own large title, riding the scroll content: 34pt bold,
-/// leading-aligned — the page's name while it sits at its start. The
-/// shell's small centered header title takes over as the page scrolls.
-struct PageLargeTitle: View {
-    let titleKey: LocalizedStringKey
-
-    var body: some View {
-        Text(titleKey)
-            .font(.system(size: 34, weight: .bold))
-            .frame(maxWidth: .infinity, alignment: .leading)
-    }
-}

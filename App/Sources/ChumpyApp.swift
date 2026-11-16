@@ -8,6 +8,9 @@ struct ChumpyApp: App {
     init() {
         // The background refresh must be registered before launch finishes.
         SubscriptionAutoUpdate.register()
+        // The log is this session's story — the last one's mountain
+        // doesn't survive the restart.
+        ChumpyLog.shared.clear()
     }
 
     var body: some Scene {
