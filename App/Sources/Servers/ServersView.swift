@@ -596,9 +596,8 @@ private struct ServerGroupRow: View {
                     .foregroundStyle(isSelected ? Color.white : Color.secondary)
             }
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 10)
-        .frame(minHeight: 64)
+        .padding(16)
+        .frame(minHeight: 72)
         .contentShape(Rectangle())
         .onTapGesture {
             // A concealed row stands where it always stood but stays out
@@ -607,11 +606,13 @@ private struct ServerGroupRow: View {
         }
     }
 
-    /// The square 40pt tile with a 12pt corner — concentric with the
-    /// group's own 28pt one (28 − 16 inset = 12), so the two roundings
-    /// nest into each other the iOS way: white-tinted over the accent
-    /// plate, tonal at rest. The flag rides the slot, names without
-    /// one keep the globe, balancers keep the explore compass.
+    /// The square 40pt tile with a 12pt corner, concentric with the
+    /// group's own 28pt one: the 16pt inset on every side puts the
+    /// tile's corner center exactly on the group corner's own center,
+    /// and 28 − 16 = 12 keeps the gap between the two curves even all
+    /// the way round — the iOS nesting law. White-tinted over the
+    /// accent plate, tonal at rest. The flag rides the slot, names
+    /// without one keep the globe, balancers keep the explore compass.
     private var tile: some View {
         ZStack {
             RoundedRectangle(cornerRadius: 12, style: .continuous)
@@ -825,9 +826,8 @@ private struct SubscriptionChooserSheet: View {
                     .foregroundStyle(Color.white)
             }
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 10)
-        .frame(minHeight: 64)
+        .padding(16)
+        .frame(minHeight: 72)
         .background(rowFill(isFirst: isFirst, isLast: false, isSelected: isSelected))
         .contentShape(Rectangle())
         .onTapGesture {
@@ -860,9 +860,8 @@ private struct SubscriptionChooserSheet: View {
                 .foregroundStyle(Color.accentColor)
             Spacer(minLength: 0)
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 10)
-        .frame(minHeight: 64)
+        .padding(16)
+        .frame(minHeight: 72)
         .background(rowFill(isFirst: false, isLast: true, isSelected: false))
         .contentShape(Rectangle())
         .onTapGesture {
