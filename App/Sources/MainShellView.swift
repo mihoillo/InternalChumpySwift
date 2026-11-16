@@ -337,7 +337,7 @@ private struct MorphingPageTitle: View {
     @State private var textWidth: CGFloat = 0
 
     private var fontSize: CGFloat {
-        34 - 17 * fold
+        chumpyLargeTitleSize - 17 * fold
     }
 
     var body: some View {
@@ -369,7 +369,7 @@ private struct MorphingPageTitle: View {
     /// sits in the strip's middle. The scroll carries it while it can,
     /// the fold gathers the rest.
     private var yPosition: CGFloat {
-        let rest = chumpyHeaderHeight + 8 + 17
+        let rest = chumpyTitleRestTop + chumpyLargeTitleSize / 2
         let folded = chumpyHeaderHeight / 2
         let traveling = rest - scrolled
         return traveling + (folded - traveling) * fold

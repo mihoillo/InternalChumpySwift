@@ -27,7 +27,7 @@ struct StatsView: View {
                 coreLogCard
             }
             .padding(.horizontal, 16)
-            .padding(.top, chumpyHeaderHeight + 8)
+            .padding(.top, chumpyContentTopPadding)
             .padding(.bottom, 104)
         }
         .onAppear { reload() }

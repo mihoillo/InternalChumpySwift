@@ -63,7 +63,7 @@ struct ServersView: View {
                 rows
             }
             .padding(.horizontal, 16)
-            .padding(.top, chumpyHeaderHeight + 8)
+            .padding(.top, chumpyContentTopPadding)
             .padding(.bottom, 104)
         }
     }
@@ -215,7 +215,7 @@ struct ServersView: View {
             Spacer()
         }
         .padding(.horizontal, 16)
-        .padding(.top, chumpyHeaderHeight + 8)
+        .padding(.top, chumpyContentTopPadding)
         .padding(.bottom, 104)
         .frame(maxWidth: .infinity)
         // The empty page doesn't scroll, so it speaks the metrics itself:

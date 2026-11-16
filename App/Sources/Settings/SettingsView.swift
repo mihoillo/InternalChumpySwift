@@ -24,7 +24,7 @@ struct SettingsView: View {
                 aboutCard
             }
             .padding(.horizontal, 16)
-            .padding(.top, chumpyHeaderHeight + 8)
+            .padding(.top, chumpyContentTopPadding)
             .padding(.bottom, 104)
         }
     }

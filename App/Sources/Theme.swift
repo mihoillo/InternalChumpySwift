@@ -401,6 +401,17 @@ extension View {
 /// under it.
 let chumpyHeaderHeight: CGFloat = 44
 
+/// Where the large title rests: just below the strip.
+let chumpyTitleRestTop: CGFloat = chumpyHeaderHeight + 8
+
+/// The large title's resting size — the big end of the morph.
+let chumpyLargeTitleSize: CGFloat = 34
+
+/// Where the page's scroll content begins: below the strip, past the
+/// resting title and its breathing room. The title is a live object in
+/// the shell — the content must start under it, not behind it.
+let chumpyContentTopPadding: CGFloat = chumpyTitleRestTop + chumpyLargeTitleSize + 12
+
 /// The scroll's word on the frost: whose scroll is speaking, how far
 /// the page has traveled, and how much content still waits below the
 /// fold. The tag tells the pages apart — the pager keeps every page
