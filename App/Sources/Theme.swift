@@ -69,12 +69,16 @@ extension View {
 }
 
 /// Rounded rect with per-corner radii wearing the platform's own
-/// continuous-corner character — the construction Figma reverse-
-/// engineered from the iOS squircle: every corner keeps a circular arc
-/// at its heart with cubic Bézier shoulders easing the curvature in
-/// from the straight edges (smoothing 0.6, the value that matches the
-/// iOS shape), so the grouped rows wear the same corners the cards do
-/// instead of the plain circular arcs of a common rounded rect.
+/// continuous-corner curve — the exact one the subscription card's
+/// shape draws, not a lookalike: on iOS 16+ the path IS the
+/// platform's per-corner continuous shape (`UnevenRoundedRectangle`,
+/// the same corner machinery `Path(roundedRect:style:.continuous)`
+/// runs), so a single-row group's corners are pixel-identical to the
+/// card's and the two can never drift apart. iOS 15 keeps the
+/// construction Figma reverse-engineered from the iOS squircle: a
+/// circular arc at each corner's heart with Bézier shoulders easing
+/// the curvature in from the straight edges (smoothing 0.6, the
+/// value that matches the platform shape).
 struct UnevenCornerShape: Shape {
     var topLeft: CGFloat
     var topRight: CGFloat
@@ -90,6 +94,21 @@ struct UnevenCornerShape: Shape {
         let tr = min(topRight, half)
         let bl = min(bottomLeft, half)
         let br = min(bottomRight, half)
+
+        // The platform's own per-corner continuous curve. Every device
+        // this app runs on (iOS 26) takes this branch; the fallback
+        // below only covers iOS 15.
+        if #available(iOS 16.0, *) {
+            return UnevenRoundedRectangle(
+                cornerRadii: RectangleCornerRadii(
+                    topLeading: tl,
+                    bottomLeading: bl,
+                    bottomTrailing: br,
+                    topTrailing: tr
+                ),
+                style: .continuous
+            ).path(in: rect)
+        }
 
         // The whole footprint a corner consumes of an edge: its radius
         // plus the smoothing's reach along the straight.
