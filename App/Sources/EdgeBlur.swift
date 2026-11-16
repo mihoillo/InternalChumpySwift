@@ -35,7 +35,7 @@ final class FadeBlurView: UIVisualEffectView {
 
     init(edge: EdgeBlur.Edge) {
         self.edge = edge
-        super.init(effect: UIBlurEffect(style: .systemUltraThin))
+        super.init(effect: UIBlurEffect(style: .systemUltraThinMaterial))
         isUserInteractionEnabled = false
 
         gradient.colors = [UIColor.clear.cgColor, UIColor.white.cgColor]
