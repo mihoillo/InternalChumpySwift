@@ -1,4 +1,5 @@
 import SwiftUI
+import ChumpyCore
 
 @main
 struct ChumpyApp: App {
