@@ -30,7 +30,7 @@ struct EdgeBlur: UIViewRepresentable {
     let edge: Edge
 
     /// How hard the frost runs, 0…1: 1 is the full ramp, 0 leaves the
-    /// band fully clear. The strength scales the ramp's own values —
+    /// band fully clear. The strength scales the filter's own radius —
     /// never the view's alpha, which flattens the material into a plain
     /// tint.
     var strength: CGFloat = 1
@@ -59,8 +59,8 @@ final class ProgressiveBlurView: UIView {
     /// dissolve and not the fuzz.
     private let fullRadius: CGFloat = 12
 
-    /// The frost's strength, 0…1 — the ramp's values are scaled by it, so
-    /// the blur dissolves without the material ever flattening into a
+    /// The frost's strength, 0…1 — the filter's radius is scaled by it,
+    /// so the blur dissolves without the material ever flattening into a
     /// tint the way an alpha fade would leave it.
     private var strength: CGFloat = 1
 
@@ -137,18 +137,22 @@ final class ProgressiveBlurView: UIView {
         setNeedsLayout()
     }
 
-    /// Rides the scroll: the ramp is redrawn at the new strength and the
-    /// filter reinstalled. The strip is a few hundred bytes — cheap
-    /// enough to rebuild on every frame of travel.
+    /// Rides the scroll: the live filter's own radius is scaled in
+    /// place — reassigning the layer's filter set on every frame of
+    /// travel disturbs the backdrop's rendering, a mutated input just
+    /// re-renders. The ramp itself stays untouched: the mask scales the
+    /// radius point by point, so scaling the radius scales the whole
+    /// dissolve.
     func setStrength(_ newValue: CGFloat) {
         let clamped = max(0, min(1, newValue))
         guard clamped != strength else { return }
         strength = clamped
-        if rampLength > 1 {
-            rampImage = Self.makeRamp(length: rampLength, edge: edge, strength: clamped)
+        if let filter = installedFilter {
+            filter.setValue(fullRadius * clamped, forKey: "inputRadius")
+        } else {
+            needsRebuild = true
+            setNeedsLayout()
         }
-        needsRebuild = true
-        setNeedsLayout()
     }
 
     override func layoutSubviews() {
@@ -164,7 +168,7 @@ final class ProgressiveBlurView: UIView {
         let length = Int(bounds.height.rounded(.up))
         if length != rampLength {
             rampLength = length
-            rampImage = Self.makeRamp(length: length, edge: edge, strength: strength)
+            rampImage = Self.makeRamp(length: length, edge: edge)
             needsRebuild = true
         }
         installBlurFilter()
@@ -195,7 +199,7 @@ final class ProgressiveBlurView: UIView {
             Self.learnFilterFactory(from: backdropView)
         }
 
-        guard let filter = Self.makeVariableBlurFilter(mask: rampImage, radius: fullRadius) else {
+        guard let filter = Self.makeVariableBlurFilter(mask: rampImage, radius: fullRadius * strength) else {
             // The private filter is unreachable — no flat gradient stands
             // in and fakes it: the band hides, and the pass keeps the
             // rebuild pending so a later layout retries.
@@ -278,9 +282,8 @@ final class ProgressiveBlurView: UIView {
     /// A one-pixel-wide strip, one pixel per band point: black at alpha 0
     /// where the blur must vanish, at alpha 255 where it is full. The
     /// variable-blur filter reads it per pixel as the blur amount. Row 0
-    /// renders at the band's top. The strength scales the whole ramp —
-    /// the blur dissolves by blurring less, never by fading the view.
-    private static func makeRamp(length: Int, edge: EdgeBlur.Edge, strength: CGFloat) -> CGImage? {
+    /// renders at the band's top.
+    private static func makeRamp(length: Int, edge: EdgeBlur.Edge) -> CGImage? {
         guard length > 1 else { return nil }
 
         guard let context = CGContext(
@@ -298,7 +301,7 @@ final class ProgressiveBlurView: UIView {
             let position = CGFloat(row) / CGFloat(length - 1)
             // A straight ramp: the radius slides evenly along the band, and
             // the dissolve carries the smoothness.
-            let amount = (edge == .top ? 1 - position : position) * strength
+            let amount = edge == .top ? 1 - position : position
             pixels[row * 2] = 0
             pixels[row * 2 + 1] = UInt8(max(0, min(255, amount * 255)))
         }

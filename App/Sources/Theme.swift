@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 // MARK: - Accent color
 // The actual tint color lives in Assets.xcassets (AccentColor).
@@ -399,53 +400,116 @@ extension View {
 /// title starts below the strip and scrolls under it.
 let chumpyHeaderHeight: CGFloat = 44
 
-/// The scroll content's frame in the "chumpy.scroll" space, reported up
-/// to the shell: its minY is the page's travel, its height the content's
-/// full extent.
-struct ScrollContentKey: PreferenceKey {
-    static var defaultValue: CGRect = .zero
-
-    static func reduce(value: inout CGRect, nextValue: () -> CGRect) {
-        value = nextValue()
-    }
+/// The scroll's word on the frost: how far the page has traveled, and
+/// how much content still waits below the fold.
+struct ScrollMetrics: Equatable {
+    var scrolled: CGFloat = 0
+    var belowFold: CGFloat = 0
 }
 
-/// The scroll viewport's height — how much of the page is on screen.
-struct ScrollViewportKey: PreferenceKey {
-    static var defaultValue: CGFloat = 0
+/// The live page's scroll, reported to the shell. The spy inside
+/// `EdgeScrollView` writes here straight from the real UIScrollView —
+/// KVO on the live object, immune to SwiftUI's scroll-view internals.
+/// A singleton: the app has one shell, one live page at a time.
+final class ScrollReporter: ObservableObject {
+    static let shared = ScrollReporter()
 
-    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
-        value = nextValue()
-    }
+    @Published var metrics = ScrollMetrics()
 }
 
-/// A ScrollView that reports its content's travel and its viewport's
-/// height up the tree, so the shell can run its edge blurs with the
-/// scroll: the header frost wakes as the page leaves its start, the bar
-/// frost sleeps as the page reaches its end.
+/// A ScrollView that reports its travel to the shell's reporter: a spy
+/// view inside the content hooks the real UIScrollView and watches its
+/// offset — the one source that never lies about the scroll.
 struct EdgeScrollView<Content: View>: View {
+    @ObservedObject private var reporter = ScrollReporter.shared
+
     @ViewBuilder var content: () -> Content
 
     var body: some View {
         ScrollView {
             content()
-                .background(
-                    GeometryReader { geo in
-                        Color.clear.preference(
-                            key: ScrollContentKey.self,
-                            value: geo.frame(in: .named("chumpy.scroll"))
-                        )
-                    }
-                )
+                .background(ScrollOffsetSpy(reporter: reporter))
         }
-        .coordinateSpace(name: "chumpy.scroll")
-        .background(
-            GeometryReader { geo in
-                Color.clear.preference(
-                    key: ScrollViewportKey.self,
-                    value: geo.size.height
-                )
+    }
+}
+
+/// The spy's door into UIKit: a plain view inside the scroll content
+/// that walks up to the UIScrollView hosting it and watches the offset
+/// and the content size. GeometryReaders went blind inside SwiftUI's
+/// scroll views — the UIScrollView never does.
+private struct ScrollOffsetSpy: UIViewRepresentable {
+    let reporter: ScrollReporter
+
+    func makeUIView(context: Context) -> ScrollOffsetSpyView {
+        ScrollOffsetSpyView(reporter: reporter)
+    }
+
+    func updateUIView(_ view: ScrollOffsetSpyView, context: Context) {}
+}
+
+private final class ScrollOffsetSpyView: UIView {
+    private let reporter: ScrollReporter
+    private var scrollView: UIScrollView?
+    private var observations: [NSKeyValueObservation] = []
+
+    init(reporter: ScrollReporter) {
+        self.reporter = reporter
+        super.init(frame: .zero)
+        isUserInteractionEnabled = false
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) is not supported")
+    }
+
+    override func didMoveToWindow() {
+        super.didMoveToWindow()
+        if window != nil {
+            attachIfNeeded()
+        } else {
+            observations.removeAll()
+            scrollView = nil
+        }
+    }
+
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        attachIfNeeded()
+    }
+
+    /// The host chain up from the content leads to the UIScrollView —
+    /// retried on every layout until it's there.
+    private func attachIfNeeded() {
+        guard scrollView == nil, window != nil else { return }
+        var candidate: UIView? = superview
+        while let view = candidate {
+            if let scroll = view as? UIScrollView {
+                scrollView = scroll
+                observe(scroll)
+                return
             }
+            candidate = view.superview
+        }
+    }
+
+    private func observe(_ scroll: UIScrollView) {
+        // `.initial` speaks the resting position the moment the page
+        // appears; `.new` carries every frame of travel afterwards.
+        observations = [
+            scroll.observe(\.contentOffset, options: [.initial, .new]) { [weak self] scroll, _ in
+                self?.report(scroll)
+            },
+            scroll.observe(\.contentSize, options: [.initial, .new]) { [weak self] scroll, _ in
+                self?.report(scroll)
+            },
+        ]
+    }
+
+    private func report(_ scroll: UIScrollView) {
+        reporter.metrics = ScrollMetrics(
+            scrolled: max(0, scroll.contentOffset.y),
+            belowFold: max(0, scroll.contentSize.height - scroll.contentOffset.y - scroll.bounds.height)
         )
     }
 }

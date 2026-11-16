@@ -12,11 +12,10 @@ struct MainShellView: View {
     @State private var lastTab: Tab = .home
     @Namespace private var tabNamespace
 
-    /// The scroll metrics the live page reports up: the content's frame
-    /// in the scroll space, and the viewport's height. Home reports
-    /// nothing and holds its ground clear.
-    @State private var scrollContent: CGRect = .zero
-    @State private var scrollViewport: CGFloat = 0
+    /// The live page's scroll, reported by the page's own spy inside the
+    /// real UIScrollView. Home reports nothing and holds its ground
+    /// clear.
+    @ObservedObject private var scrollReporter = ScrollReporter.shared
 
     enum Tab: Int, CaseIterable, Identifiable {
         case home, servers, stats
@@ -74,12 +73,12 @@ struct MainShellView: View {
 
     /// How far the page has traveled from its start.
     private var scrolled: CGFloat {
-        max(0, -scrollContent.minY)
+        scrollReporter.metrics.scrolled
     }
 
     /// How much content still waits below the fold — zero at the end.
     private var belowFold: CGFloat {
-        max(0, scrollContent.height - scrolled - scrollViewport)
+        scrollReporter.metrics.belowFold
     }
 
     /// The header frost's strength: off at the start, committed once the
@@ -108,8 +107,6 @@ struct MainShellView: View {
         ZStack(alignment: .bottom) {
             content
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .onPreferenceChange(ScrollContentKey.self) { scrollContent = $0 }
-                .onPreferenceChange(ScrollViewportKey.self) { scrollViewport = $0 }
 
             // The frost at the screen's edges, run by the scroll. The
             // pages carry their own large title in the content; the header
@@ -184,8 +181,7 @@ struct MainShellView: View {
         withAnimation(barMotion) {
             page = Page(tab: tab)
             lastTab = tab
-            scrollContent = .zero
-            scrollViewport = 0
+            scrollReporter.metrics = ScrollMetrics()
         }
     }
 
@@ -263,8 +259,7 @@ struct MainShellView: View {
         return Button {
             withAnimation(barMotion) {
                 page = onSettings ? Page(tab: lastTab) : .settings
-                scrollContent = .zero
-                scrollViewport = 0
+                scrollReporter.metrics = ScrollMetrics()
             }
         } label: {
             Image(systemName: "gearshape.fill")

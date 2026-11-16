@@ -223,8 +223,9 @@ struct ServersView: View {
         .frame(maxWidth: .infinity)
         // The empty page doesn't scroll, so it speaks the metrics itself:
         // no travel, nothing below the fold — both frosts stay asleep.
-        .preference(key: ScrollContentKey.self, value: .zero)
-        .preference(key: ScrollViewportKey.self, value: 0)
+        .onAppear {
+            ScrollReporter.shared.metrics = ScrollMetrics()
+        }
     }
 }
 
