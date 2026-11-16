@@ -3,9 +3,9 @@ import SwiftUI
 /// The app shell: full-screen content with Chumpy's two-pill floating bar —
 /// the tabs' pill on the left, the round gear button on the right. Ported
 /// from the Android client's `FloatingBottomBar`: Liquid Glass on iOS 26,
-/// frosted material below. The pages ride one deck — a horizontal swipe
-/// deals it like a book's pages, the bar's buttons scroll it vertically,
-/// screen over screen. The indicator slides between the tabs, the gear
+/// frosted material below. The pages ride one horizontal deck — a swipe
+/// deals it under the finger, the bar's buttons scroll it along the same
+/// spine, page over page. The indicator slides between the tabs, the gear
 /// turns on its own hinge.
 struct MainShellView: View {
     @EnvironmentObject private var appState: AppState
@@ -56,7 +56,7 @@ struct MainShellView: View {
 
     /// The deck's own ride: every page change slides along it — a
     /// swipe settles on it once the finger lets go, the bar's buttons
-    /// scroll the deck across it, screen over screen.
+    /// scroll the deck across it, page over page.
     private let deckMotion = Animation.spring(response: 0.45, dampingFraction: 0.85)
 
     /// The bar's own spring — snappier than the page's, with a bit of
@@ -174,12 +174,12 @@ struct MainShellView: View {
         .ignoresSafeArea(.keyboard, edges: .bottom)
     }
 
-    /// The pages as one deck, one screen apiece, stacked in the
-    /// shell's frame. A horizontal swipe deals it like a book's pages,
-    /// following the finger; the bar's buttons scroll it vertically,
-    /// screen over screen — the way a tall column of screens reads.
-    /// Every page stays alive: scroll positions, and each one's own
-    /// word on the frost, survive the rides between them.
+    /// The pages as one horizontal deck, one screen apiece, stacked in
+    /// the shell's frame. A swipe deals it under the finger; the bar's
+    /// buttons scroll it along the same spine, page over page — the
+    /// way a wide row of screens reads. Every page stays alive: scroll
+    /// positions, and each one's own word on the frost, survive the
+    /// rides between them.
     private var pager: some View {
         GeometryReader { geo in
             ZStack {
@@ -199,15 +199,10 @@ struct MainShellView: View {
     }
 
     /// Where a page sits on the deck: the live page under the shell,
-    /// the others a whole screen away along the ride's axis.
+    /// the others a whole screen away along the spine.
     private func pageOffset(for page: Page, in size: CGSize) -> CGSize {
         let distance = CGFloat(page.rawValue) - deckPosition
-        switch rideAxis {
-        case .horizontal:
-            return CGSize(width: distance * size.width, height: 0)
-        case .vertical:
-            return CGSize(width: 0, height: distance * size.height)
-        }
+        return CGSize(width: distance * size.width, height: 0)
     }
 
     // MARK: - The deck's ride
@@ -217,9 +212,6 @@ struct MainShellView: View {
     /// during a swipe.
     @State private var deckPosition: CGFloat = 0
 
-    /// The axis the current ride slides along.
-    @State private var rideAxis: RideAxis = .vertical
-
     /// The spine position the current drag started from.
     @State private var dragAnchor: CGFloat = 0
 
@@ -228,21 +220,22 @@ struct MainShellView: View {
     /// once its own direction reads horizontal.
     @State private var dragging = false
 
-    enum RideAxis { case horizontal, vertical }
-
     /// The horizontal swipe: a clearly horizontal drag is the deck's —
     /// the finger leads, the ends resist, and letting go settles on
-    /// the nearest page or the one the throw points at.
+    /// the nearest page or the one the throw points at. A swipe left
+    /// deals the next page, a swipe right the one before it.
     private func deckDrag(in size: CGSize) -> some Gesture {
         DragGesture(minimumDistance: 24)
             .onChanged { value in
                 if !dragging {
                     guard abs(value.translation.width) > abs(value.translation.height) else { return }
                     dragging = true
-                    rideAxis = .horizontal
                     dragAnchor = deckPosition.rounded()
                 }
-                let traveled = value.translation.width / size.width
+                // Left is forward along the spine — the finger drags
+                // the deck, not the position, so the travel is the
+                // translation's mirror.
+                let traveled = -value.translation.width / size.width
                 let available = CGFloat(Page.settings.rawValue)
                 let raw = dragAnchor + traveled
                 // The ends resist: past the first or the last page the
@@ -254,8 +247,8 @@ struct MainShellView: View {
             .onEnded { value in
                 guard dragging else { return }
                 dragging = false
-                let traveled = value.translation.width / size.width
-                let thrown = value.velocity.width / size.width * 0.25
+                let traveled = -value.translation.width / size.width
+                let thrown = -value.velocity.width / size.width * 0.25
                 let raw = dragAnchor + traveled + thrown
                 let available = CGFloat(Page.settings.rawValue)
                 let target = min(max(raw.rounded(), 0), available)
@@ -270,10 +263,9 @@ struct MainShellView: View {
             }
     }
 
-    /// Sends the deck to a page on the bar's own ride: vertically,
-    /// screen over screen, on the shared spring.
+    /// Sends the deck to a page on the bar's own ride: along the same
+    /// horizontal spine, page over page, on the shared spring.
     private func rideDeck(to target: Page) {
-        rideAxis = .vertical
         withAnimation(deckMotion) {
             page = target
             deckPosition = CGFloat(target.rawValue)
