@@ -15,11 +15,21 @@ struct SettingsView: View {
         ChumpyConstant.Keys.testURL,
         store: ChumpyConstant.sharedDefaults
     ) private var testURL: String = "https://www.gstatic.com/generate_204"
+    /// The subscriptions' own word, re-read from the store on every
+    /// appear — the auto-update card's rows.
+    @State private var subscriptions: [SubscriptionEntity] = []
+
+    /// The store the subscriptions live in — file-backed, the same one
+    /// the servers screen writes through.
+    private let store = ProfileStore()
 
     var body: some View {
         EdgeScrollView(tag: "settings") {
             VStack(spacing: 12) {
                 connectionCard
+                if !subscriptions.isEmpty {
+                    subscriptionsCard
+                }
                 tunnelCard
                 aboutCard
             }
@@ -27,6 +37,45 @@ struct SettingsView: View {
             .padding(.top, chumpyContentTopPadding)
             .padding(.bottom, 104)
         }
+        .onAppear {
+            subscriptions = store.subscriptions().sorted { $0.createdAt < $1.createdAt }
+        }
+    }
+
+    // MARK: - Subscriptions
+
+    /// The auto-update law, per subscription — where the original
+    /// client keeps it: in the settings, not in the groups' chooser.
+    private var subscriptionsCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            ChartHeader(icon: "arrow.triangle.2.circlepath", title: "settings.subscriptions")
+
+            ForEach(subscriptions) { sub in
+                Toggle(isOn: autoUpdateBinding(sub)) {
+                    Text(sub.name.isEmpty ? sub.url : sub.name)
+                        .font(.system(size: 15))
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                }
+                .tint(Chumpy.accent)
+            }
+        }
+        .padding(16)
+        .chumpyCard()
+    }
+
+    /// The toggle's own write: the store answers, the background
+    /// schedule re-arms itself with the new set of due dates, and the
+    /// rows re-read what the store now says.
+    private func autoUpdateBinding(_ sub: SubscriptionEntity) -> Binding<Bool> {
+        Binding(
+            get: { sub.autoUpdate },
+            set: { enabled in
+                store.setSubscriptionAutoUpdate(id: sub.id, enabled: enabled)
+                SubscriptionAutoUpdate.schedule()
+                subscriptions = store.subscriptions().sorted { $0.createdAt < $1.createdAt }
+            }
+        )
     }
 
     // MARK: - Connection

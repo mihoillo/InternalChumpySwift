@@ -52,6 +52,7 @@
 "stats.empty" = "No log entries yet. Connect to see the core log.";
 
 "settings.connection" = "Connection";
+"settings.subscriptions" = "Subscriptions";
 "settings.routing" = "Routing";
 "settings.testURL" = "Delay test URL";
 "settings.tunnel" = "Tunnel";

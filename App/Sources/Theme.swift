@@ -143,7 +143,9 @@ struct InfoChip: View {
         chipContent()
             .padding(.leading, 10)
             .padding(.trailing, 12)
-            .padding(.vertical, 6)
+            // One law for every chip's height — the icon'd and the bare
+            // ones all stand the same size in a row.
+            .frame(height: 32)
             .background(
                 RoundedRectangle(cornerRadius: 8, style: .continuous)
                     .fill(container)
@@ -300,6 +302,14 @@ struct FlowLayout: Layout {
             width = max(width, rowWidth)
         }
         closeRow(until: positions.count)
+        // A centered row's inset pushes its chips past the natural
+        // width, and SwiftUI would center the already-centered content
+        // a second time — the rows would land shifted toward the far
+        // edge. The size owns the whole offered width instead, so the
+        // insets are the only centering there is.
+        if alignment == .center, maxWidth.isFinite {
+            width = max(width, maxWidth)
+        }
         return (CGSize(width: width, height: y + rowHeight), positions)
     }
 }
@@ -450,6 +460,9 @@ struct EdgeScrollView<Content: View>: View {
     /// The page this scroll speaks for — the shell heeds only the
     /// page it stands on.
     let tag: String
+    /// The pull-to-refresh ask, when the page has one — the system's
+    /// own spinner under the finger's pull.
+    var onRefresh: (() async -> Void)? = nil
     /// A plain hold on the shared reporter — the scroll only writes
     /// its word; it never re-renders on the shell's reads.
     private let reporter = ScrollReporter.shared
@@ -471,29 +484,44 @@ struct EdgeScrollView<Content: View>: View {
     /// The system's own word on the scroll, where the system speaks it.
     @available(iOS 18.0, *)
     private var modernScrollView: some View {
-        ScrollView {
-            content()
-        }
-        .onScrollGeometryChange(for: ScrollMetrics.self) { geo in
-            // A scroll view at rest can sit at a negative offset — its
-            // top inset. The inset folds back in, so "scrolled" reads as
-            // points traveled from the start, zero-based.
-            let scrolled = max(0, geo.contentOffset.y + geo.contentInsets.top)
-            return ScrollMetrics(
-                tag: tag,
-                scrolled: scrolled,
-                belowFold: max(0, geo.contentSize.height - scrolled - geo.containerSize.height)
-            )
-        } action: { _, metrics in
-            reporter.report(metrics)
-        }
+        attachRefresh(
+            ScrollView {
+                content()
+            }
+            .onScrollGeometryChange(for: ScrollMetrics.self) { geo in
+                // A scroll view at rest can sit at a negative offset — its
+                // top inset. The inset folds back in, so "scrolled" reads as
+                // points traveled from the start, zero-based.
+                let scrolled = max(0, geo.contentOffset.y + geo.contentInsets.top)
+                return ScrollMetrics(
+                    tag: tag,
+                    scrolled: scrolled,
+                    belowFold: max(0, geo.contentSize.height - scrolled - geo.containerSize.height)
+                )
+            } action: { _, metrics in
+                reporter.report(metrics)
+            }
+        )
     }
 
     /// The UIKit spy, for the systems that predate the official word.
     private var legacyScrollView: some View {
-        ScrollView {
-            content()
-                .background(ScrollOffsetSpy(reporter: reporter, pageTag: tag))
+        attachRefresh(
+            ScrollView {
+                content()
+                    .background(ScrollOffsetSpy(reporter: reporter, pageTag: tag))
+            }
+        )
+    }
+
+    /// Pull-to-refresh, where the system gives a plain ScrollView one
+    /// (iOS 16+); the 15 baseline keeps its plain scroll.
+    @ViewBuilder
+    private func attachRefresh(_ view: some View) -> some View {
+        if #available(iOS 16.0, *), let onRefresh {
+            view.refreshable { await onRefresh() }
+        } else {
+            view
         }
     }
 }

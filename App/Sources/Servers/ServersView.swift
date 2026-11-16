@@ -1,43 +1,46 @@
 import SwiftUI
+import UIKit
 import ChumpyCore
 
 /// Servers tab, ported from the Android client's `ServersScreen` layout:
 /// the subscription card with the database tile, the centered chips header
 /// (total / expired / concealed / sort), and the grouped rows wearing the
 /// outer 28dp corners at the group's own edges and the small 4dp ones
-/// inside.
+/// inside. Pull-to-refresh runs the real-ping sweep.
 struct ServersView: View {
     @EnvironmentObject private var appState: AppState
     @StateObject private var model = ServersViewModel()
-    @State private var showAddSubscription = false
-    @State private var showPasteLinks = false
     @State private var showSubscriptionChooser = false
+    /// The add dialog's own state — one field, three answers.
+    @State private var showAddDialog = false
+    @State private var addInput = ""
+    @State private var addBusy = false
+    @State private var addError: String?
 
     var body: some View {
-        Group {
-            if model.profiles.isEmpty && model.subscriptions.isEmpty {
-                emptyState
-            } else {
-                list
+        ZStack {
+            Group {
+                if model.profiles.isEmpty && model.subscriptions.isEmpty {
+                    emptyState
+                } else {
+                    list
+                }
+            }
+            if showAddDialog {
+                addDialog
+                    .transition(.opacity.combined(with: .scale(scale: 0.96)))
             }
         }
+        .animation(.spring(response: 0.32, dampingFraction: 0.85), value: showAddDialog)
         .onAppear {
             model.tunnelUp = {
                 appState.status == .connected || appState.status == .reasserting
             }
             model.reload()
         }
-        .sheet(isPresented: $showAddSubscription) {
-            AddSubscriptionSheet(model: model)
-        }
-        .sheet(isPresented: $showPasteLinks) {
-            PasteLinksSheet(model: model)
-        }
         .sheet(isPresented: $showSubscriptionChooser) {
             SubscriptionChooserSheet(model: model) {
-                showAddSubscription = true
-            } showPasteLinks: {
-                showPasteLinks = true
+                showAddDialog = true
             }
         }
     }
@@ -45,7 +48,9 @@ struct ServersView: View {
     // MARK: - List
 
     private var list: some View {
-        EdgeScrollView(tag: "servers") {
+        EdgeScrollView(tag: "servers", onRefresh: {
+            await model.pingServers()
+        }) {
             VStack(spacing: 12) {
                 if let error = model.error {
                     ErrorCard(message: error)
@@ -202,7 +207,7 @@ struct ServersView: View {
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, 32)
             Button {
-                showAddSubscription = true
+                showAddDialog = true
             } label: {
                 Label("servers.add.subscription", systemImage: "plus")
                     .font(.system(size: 14, weight: .semibold))
@@ -223,6 +228,134 @@ struct ServersView: View {
         .onAppear {
             ScrollReporter.shared.report(ScrollMetrics(tag: "servers"))
         }
+    }
+
+    // MARK: - The add dialog
+
+    /// The add door: a dialog card over a dimmed veil — one text field,
+    /// three answers. Add takes a subscription URL or pasted share
+    /// links (the model tells them apart); paste fills the field from
+    /// the clipboard; cancel folds the veil away.
+    private var addDialog: some View {
+        ZStack {
+            Color.black.opacity(0.25)
+                .ignoresSafeArea()
+                .onTapGesture { closeAddDialog() }
+
+            VStack(spacing: 14) {
+                Text("servers.add.subscription")
+                    .font(.system(size: 16, weight: .semibold))
+
+                TextField("servers.add.urlPlaceholder", text: $addInput)
+                    .font(.system(size: 15))
+                    .keyboardType(.URL)
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 10)
+                    .background(
+                        RoundedRectangle(cornerRadius: 12, style: .continuous)
+                            .fill(Chumpy.surfaceContainerLow)
+                    )
+
+                if let addError {
+                    Text(addError)
+                        .font(.footnote)
+                        .foregroundStyle(Color.red)
+                        .multilineTextAlignment(.center)
+                }
+
+                HStack(spacing: 8) {
+                    Button {
+                        pasteFromClipboard()
+                    } label: {
+                        Image(systemName: "doc.on.clipboard")
+                            .font(.system(size: 15, weight: .medium))
+                            .foregroundStyle(Color.accentColor)
+                            .frame(width: 44, height: 40)
+                            .background(
+                                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                    .fill(Chumpy.secondaryContainer)
+                            )
+                    }
+                    .buttonStyle(.plain)
+
+                    Button {
+                        closeAddDialog()
+                    } label: {
+                        Text("common.cancel")
+                            .font(.system(size: 15, weight: .medium))
+                            .foregroundStyle(.primary)
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 40)
+                            .background(Capsule().fill(Chumpy.secondaryContainer))
+                    }
+                    .buttonStyle(.plain)
+
+                    Button {
+                        submitAdd()
+                    } label: {
+                        Group {
+                            if addBusy {
+                                ProgressView()
+                                    .scaleEffect(0.8)
+                            } else {
+                                Text("common.add")
+                            }
+                        }
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 40)
+                        .background(Capsule().fill(Chumpy.accent))
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(!canSubmit)
+                    .opacity(!canSubmit ? 0.5 : 1)
+                }
+            }
+            .padding(20)
+            .frame(maxWidth: 340)
+            .chumpyCard()
+        }
+    }
+
+    private var canSubmit: Bool {
+        !addBusy && !addInput.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    /// The clipboard's own word into the field — appended as its own
+    /// line when the field already holds one.
+    private func pasteFromClipboard() {
+        guard let pasted = UIPasteboard.general.string else { return }
+        let trimmed = pasted.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        let field = addInput.trimmingCharacters(in: .whitespacesAndNewlines)
+        addInput = field.isEmpty ? trimmed : field + "\n" + trimmed
+    }
+
+    /// The dialog's own answer: the model tells a subscription URL from
+    /// pasted share links — a http(s) link fetches as a subscription,
+    /// anything else lands as manual configs.
+    private func submitAdd() {
+        guard canSubmit else { return }
+        addBusy = true
+        addError = nil
+        Task {
+            await model.addSubscription(url: addInput) { failure in
+                addBusy = false
+                if let failure {
+                    addError = failure
+                } else {
+                    closeAddDialog()
+                }
+            }
+        }
+    }
+
+    private func closeAddDialog() {
+        addError = nil
+        showAddDialog = false
     }
 }
 
@@ -583,14 +716,13 @@ private struct ServerGroupRow: View {
 
 // MARK: - Subscription chooser sheet
 
-/// The groups' own chooser: the subscription card's tap opens it, and every
-/// option stands as a thick Chumpy row — the database tile, the name, the
-/// host under it, the checkmark on the standing one — with the auto-update
-/// switch, the add actions and the delete at the bottom.
+/// The groups' own chooser: the subscription card's tap opens it — the
+/// standing one wears the tint and its checkmark, a long-press asks the
+/// delete (the same context menu the server rows wear), and the one add
+/// row at the bottom opens the dialog.
 private struct SubscriptionChooserSheet: View {
     @ObservedObject var model: ServersViewModel
     var onAddSubscription: () -> Void
-    var showPasteLinks: () -> Void
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
@@ -617,32 +749,7 @@ private struct SubscriptionChooserSheet: View {
                         )
                     }
 
-                    if let sub = model.selectedSubscription,
-                       sub.id != standaloneSubscriptionID {
-                        autoUpdateRow(sub)
-                        deleteRow(sub)
-                    }
-
-                    addActionRow(
-                        titleKey: "servers.add.subscription",
-                        icon: "link.badge.plus",
-                        action: {
-                            dismiss()
-                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.45) {
-                                onAddSubscription()
-                            }
-                        }
-                    )
-                    addActionRow(
-                        titleKey: "servers.add.paste",
-                        icon: "doc.on.clipboard",
-                        action: {
-                            dismiss()
-                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.45) {
-                                showPasteLinks()
-                            }
-                        }
-                    )
+                    addRow
                 }
                 .padding(.horizontal, 16)
                 .padding(.top, 12)
@@ -659,7 +766,8 @@ private struct SubscriptionChooserSheet: View {
     }
 
     /// One thick group row: 64pt minimum, the tile, the name over the host,
-    /// the standing one painted tonal with its checkmark.
+    /// the standing one painted tonal with its checkmark — and a
+    /// long-press asking the group's delete.
     private func row(id: String, name: String, subtitle: String) -> some View {
         let isSelected = model.selectedSubscriptionID == id
 
@@ -702,82 +810,34 @@ private struct SubscriptionChooserSheet: View {
             )
         }
         .buttonStyle(.plain)
-    }
-
-    /// The standing subscription's own background refresh switch.
-    private func autoUpdateRow(_ sub: SubscriptionEntity) -> some View {
-        HStack(spacing: 16) {
-            ZStack {
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .fill(Chumpy.secondaryContainer)
-                    .frame(width: 40, height: 40)
-                Image(systemName: "arrow.triangle.2.circlepath")
-                    .font(.system(size: 16, weight: .medium))
-                    .foregroundStyle(Color.accentColor)
+        .contextMenu {
+            Button(role: .destructive) {
+                model.deleteSubscription(id)
+                dismiss()
+            } label: {
+                Label("servers.deleteSubscription", systemImage: "trash")
             }
-            Text("servers.autoUpdate")
-                .font(.system(size: 16, weight: .medium))
-            Spacer()
-            Toggle(
-                isOn: Binding(
-                    get: { sub.autoUpdate },
-                    set: { model.setSubscriptionAutoUpdate(id: sub.id, enabled: $0) }
-                )
-            ) {}
-            .labelsHidden()
-            .tint(Chumpy.accent)
         }
-        .padding(16)
-        .frame(minHeight: 72)
-        .background(
-            RoundedRectangle(cornerRadius: 20, style: .continuous)
-                .fill(Chumpy.surfaceContainer)
-        )
     }
 
-    /// The group's own delete — the whole subscription with everything it
-    /// brought in, or the standalone group.
-    private func deleteRow(_ sub: SubscriptionEntity) -> some View {
+    /// The one add row — the dialog's door.
+    private var addRow: some View {
         Button {
-            model.deleteSubscription(sub.id)
             dismiss()
-        } label: {
-            HStack(spacing: 16) {
-                ZStack {
-                    RoundedRectangle(cornerRadius: 12, style: .continuous)
-                        .fill(Color.red.opacity(0.14))
-                        .frame(width: 40, height: 40)
-                    Image(systemName: "trash")
-                        .font(.system(size: 16, weight: .medium))
-                        .foregroundStyle(Color.red)
-                }
-                Text("servers.deleteSubscription")
-                    .font(.system(size: 16, weight: .medium))
-                    .foregroundStyle(Color.red)
-                Spacer()
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.45) {
+                onAddSubscription()
             }
-            .padding(16)
-            .frame(minHeight: 72)
-            .background(
-                RoundedRectangle(cornerRadius: 20, style: .continuous)
-                    .fill(Chumpy.surfaceContainer)
-            )
-        }
-        .buttonStyle(.plain)
-    }
-
-    private func addActionRow(titleKey: LocalizedStringKey, icon: String, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
+        } label: {
             HStack(spacing: 16) {
                 ZStack {
                     RoundedRectangle(cornerRadius: 12, style: .continuous)
                         .fill(Chumpy.secondaryContainer)
                         .frame(width: 40, height: 40)
-                    Image(systemName: icon)
+                    Image(systemName: "link.badge.plus")
                         .font(.system(size: 16, weight: .medium))
                         .foregroundStyle(Color.accentColor)
                 }
-                Text(titleKey)
+                Text("servers.add.subscription")
                     .font(.system(size: 16, weight: .medium))
                     .foregroundStyle(.primary)
                 Spacer()
@@ -793,114 +853,5 @@ private struct SubscriptionChooserSheet: View {
             )
         }
         .buttonStyle(.plain)
-    }
-}
-
-// MARK: - Sheets
-
-private struct AddSubscriptionSheet: View {
-    @ObservedObject var model: ServersViewModel
-    @Environment(\.dismiss) private var dismiss
-    @State private var url = ""
-    @State private var name = ""
-    @State private var busy = false
-    @State private var error: String?
-
-    var body: some View {
-        NavHost {
-            Form {
-                Section {
-                    TextField("servers.add.urlPlaceholder", text: $url)
-                        .keyboardType(.URL)
-                        .textInputAutocapitalization(.never)
-                        .autocorrectionDisabled()
-                } header: {
-                    Text("servers.add.url")
-                }
-                Section {
-                    TextField("servers.add.namePlaceholder", text: $name)
-                        .textInputAutocapitalization(.words)
-                } header: {
-                    Text("servers.add.name")
-                } footer: {
-                    Text("servers.add.nameFooter")
-                }
-                if let error {
-                    Section {
-                        Text(error).foregroundStyle(.red)
-                    }
-                }
-            }
-            .navigationTitle("servers.add.subscription")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("common.cancel") { dismiss() }
-                }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("common.add") {
-                        busy = true
-                        Task {
-                            await model.addSubscription(url: url, name: name) { failure in
-                                busy = false
-                                error = failure
-                                if failure == nil { dismiss() }
-                            }
-                        }
-                    }
-                    .disabled(url.trimmingCharacters(in: .whitespaces).isEmpty || busy)
-                }
-            }
-        }
-    }
-}
-
-private struct PasteLinksSheet: View {
-    @ObservedObject var model: ServersViewModel
-    @Environment(\.dismiss) private var dismiss
-    @State private var text = ""
-    @State private var error: String?
-
-    var body: some View {
-        NavHost {
-            VStack(spacing: 12) {
-                TextEditor(text: $text)
-                    .font(.body.monospaced())
-                    .frame(maxHeight: .infinity)
-                    .padding(8)
-                    .chumpyCard(radius: 12)
-                    .padding(.horizontal)
-                if let error {
-                    Text(error)
-                        .font(.footnote)
-                        .foregroundStyle(.red)
-                        .padding(.horizontal, 24)
-                }
-                Button {
-                    model.addManualProfiles(text) { failure in
-                        error = failure
-                        if failure == nil { dismiss() }
-                    }
-                } label: {
-                    Text("servers.add.import")
-                        .font(.system(size: 14, weight: .semibold))
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 14)
-                        .background(Capsule().fill(Chumpy.secondaryContainer))
-                        .foregroundStyle(Color.accentColor)
-                }
-                .buttonStyle(.plain)
-                .disabled(text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                .padding(.horizontal)
-                .padding(.bottom, 8)
-            }
-            .navigationTitle("servers.add.paste")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("common.cancel") { dismiss() }
-                }
-            }
-        }
     }
 }

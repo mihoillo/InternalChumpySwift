@@ -52,6 +52,7 @@
 "stats.empty" = "Записей пока нет. Подключитесь, чтобы увидеть лог ядра.";
 
 "settings.connection" = "Подключение";
+"settings.subscriptions" = "Подписки";
 "settings.routing" = "Маршрутизация";
 "settings.testURL" = "URL теста задержки";
 "settings.tunnel" = "Туннель";
