@@ -401,7 +401,7 @@ struct LiquidConnectBar: View {
         ZStack {
             TimelineView(.animation(minimumInterval: 1.0 / 30)) { timeline in
                 Canvas { context, size in
-                    draw(timeline: timeline, size: size, context: context)
+                    draw(timeline: timeline, size: size, context: &context)
                 }
                 .blur(radius: 6)
             }
@@ -432,7 +432,11 @@ struct LiquidConnectBar: View {
 
     /// One wave's whole run: born at its edge, gliding to the center,
     /// wobbling on its own frequency, fading out as the two fronts meet.
-    private func draw(timeline: TimelineViewDefaultContext, size: CGSize, context: GraphicsContext) {
+    private func draw(
+        timeline: TimelineViewDefaultContext,
+        size: CGSize,
+        context: inout GraphicsContext
+    ) {
         // Light composites as light: the waves add onto each other where
         // they overlap — the meeting point at the center glows.
         context.blendMode = .plusLighter
