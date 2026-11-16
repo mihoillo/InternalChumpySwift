@@ -266,16 +266,27 @@ struct HomeView: View {
 
     // MARK: - Connect button
 
-    /// The full-width 64pt capsule: the liquid glass bar inside carries
-    /// the whole state — Siri-style color refraction swirling in the glass,
-    /// dim and slow while idle, vivid once the tunnel stands.
+    /// The full-width 64pt capsule: primary fill when up, the calm tonal
+    /// one when idle — the MD3 Expressive wavy bar inside carries the whole
+    /// state. The bar keeps its own side insets so the wave's round caps
+    /// never crowd the capsule's rounded ends.
     private var connectButton: some View {
         Button {
             Task { await appState.toggle() }
         } label: {
-            LiquidConnectBar(isUp: isUp)
-                .frame(height: 64)
-                .frame(maxWidth: .infinity)
+            WavyConnectBar(
+                fill: connectFill,
+                draining: appState.status == .disconnecting,
+                color: isUp ? Color.white : Chumpy.accent,
+                trackColor: (isUp ? Color.white : Chumpy.accent).opacity(0.30)
+            )
+            .padding(.horizontal, 28)
+            .frame(height: 20)
+            .frame(maxWidth: .infinity)
+            .frame(height: 64)
+            .background(
+                Capsule().fill(isUp ? Chumpy.accent : Chumpy.secondaryContainer)
+            )
         }
         .buttonStyle(.plain)
         .disabled(appState.isProcessing)
@@ -360,120 +371,133 @@ struct ServerCard: View {
     }
 }
 
-// MARK: - Liquid connect bar
+// MARK: - Wavy connect bar
 
-/// The connect button's own glass. The color rides under the glass, not on
-/// it: two streams of soft color waves enter from the left and right edges —
-/// the refraction at the rim — and travel toward the center, wobbling as
-/// they go, brightening where they meet. Over them stands the glass itself:
-/// stock Liquid Glass on iOS 26, plain frosted matte below — the waves read
-/// through the material the way light reads through frosted glass.
-///
-/// The waves always drift at one constant speed, so the motion never jumps
-/// when the state flips — only the intensity animates, which SwiftUI does
-/// natively: dim while idle, full strength once the tunnel stands.
-struct LiquidConnectBar: View {
-    let isUp: Bool
+/// MD3 Expressive-style wavy progress bar, ported from the Android client's
+/// `WavyConnectBar`: rounded caps everywhere, the wave travels continuously
+/// (one wavelength per 1600 ms loop), the bar fills while connecting and
+/// drains while disconnecting, a flat track behind the wave with a small gap.
+struct WavyConnectBar: View {
+    /// 0 when disconnected, 1 when connected — the fill target.
+    let fill: CGFloat
+    /// True while the tunnel is draining — the wave retreats to the right.
+    var draining = false
+    let color: Color
+    let trackColor: Color
 
-    private struct Wave {
-        let color: Color
-        /// Where in the loop this wave stands, 0…1.
-        let offset: Double
-        /// The vertical wobble's own frequency and phase.
-        let yFreq: Double
-        let yPhase: Double
-    }
-
-    /// The left stream's palette and the right's — different hues per side
-    /// so the two fronts read as two refractions meeting.
-    private let leftWaves: [Wave] = [
-        Wave(color: Chumpy.accent, offset: 0.00, yFreq: 3, yPhase: 0.0),
-        Wave(color: .teal, offset: 0.33, yFreq: 4, yPhase: 1.3),
-        Wave(color: .purple, offset: 0.66, yFreq: 3, yPhase: 2.6),
-    ]
-    private let rightWaves: [Wave] = [
-        Wave(color: .pink, offset: 0.16, yFreq: 3, yPhase: 0.7),
-        Wave(color: .blue, offset: 0.50, yFreq: 4, yPhase: 2.0),
-        Wave(color: .orange, offset: 0.83, yFreq: 3, yPhase: 4.1),
-    ]
+    /// The in-flight transition: where the fill started and when. Nil at
+    /// rest, so the timeline pauses and the flat track stops drawing frames.
+    @State private var animFrom: CGFloat = 0
+    @State private var animStart: Date?
+    private let fillDuration: TimeInterval = 0.6
+    private var loopSeconds: TimeInterval { 1.6 }
 
     var body: some View {
-        ZStack {
-            TimelineView(.animation(minimumInterval: 1.0 / 30)) { timeline in
-                Canvas { context, size in
-                    draw(timeline: timeline, size: size, context: &context)
-                }
-                .blur(radius: 6)
+        TimelineView(.animation(minimumInterval: 1.0 / 30, paused: isSettled)) { timeline in
+            Canvas { context, size in
+                draw(
+                    in: size,
+                    fill: currentFill(at: timeline.date),
+                    phase: phase(at: timeline.date),
+                    context: context
+                )
             }
-            // Idle the refraction stays a quiet undertone; connected it
-            // comes up to full strength.
-            .opacity(isUp ? 1.0 : 0.38)
-
-            glassLayer
         }
-        .clipShape(Capsule())
-        .animation(.easeInOut(duration: 0.7), value: isUp)
+        .onAppear {
+            animFrom = fill
+            animStart = nil
+        }
+        .onChange(of: fill) { target in
+            animFrom = currentFill(at: Date())
+            animStart = Date()
+        }
+        // The settled flag rides the flight's own end: after the duration
+        // the timeline pauses again (the flat track is a static line).
+        .task(id: fill) {
+            guard animStart != nil else { return }
+            try? await Task.sleep(nanoseconds: UInt64(fillDuration * 1_100_000_000) + 50_000_000)
+            animStart = nil
+        }
     }
 
-    /// The glass itself: stock Liquid Glass on iOS 26, plain frosted matte
-    /// below — no painted rims, no fake speculars.
-    @ViewBuilder
-    private var glassLayer: some View {
-        #if compiler(>=6.2)
-        if #available(iOS 26.0, *) {
-            Color.clear.glassEffect(in: Capsule())
-        } else {
-            Capsule().fill(.regularMaterial)
-        }
-        #else
-        Capsule().fill(.regularMaterial)
-        #endif
+    private var isSettled: Bool {
+        fill < 0.001 && animStart == nil
     }
 
-    /// One wave's whole run: born at its edge, gliding to the center,
-    /// wobbling on its own frequency, fading out as the two fronts meet.
-    private func draw(
-        timeline: TimelineViewDefaultContext,
-        size: CGSize,
-        context: inout GraphicsContext
-    ) {
-        // Light composites as light: the waves add onto each other where
-        // they overlap — the meeting point at the center glows.
-        context.blendMode = .plusLighter
+    private func currentFill(at date: Date) -> CGFloat {
+        guard let start = animStart else { return fill }
+        let t = min(1, date.timeIntervalSince(start) / fillDuration)
+        let eased = 1 - pow(1 - t, 2)
+        return animFrom + (fill - animFrom) * eased
+    }
+
+    private func phase(at date: Date) -> CGFloat {
+        CGFloat(date.timeIntervalSinceReferenceDate.truncatingRemainder(dividingBy: loopSeconds) / loopSeconds)
+    }
+
+    private func draw(in size: CGSize, fill: CGFloat, phase: CGFloat, context: GraphicsContext) {
         let width = size.width
-        let height = size.height
-        // One edge-to-center run takes ~2.8 s; three waves per side keep a
-        // front arriving roughly every second.
-        let t = timeline.date.timeIntervalSinceReferenceDate * 0.35
+        let centerY = size.height / 2
+        let stroke: CGFloat = 6
+        let amplitude: CGFloat = 5
+        let wavelength: CGFloat = 28
+        let gap: CGFloat = 4
+        let phasePx = phase * wavelength
+        let inset = stroke / 2
+        let wavyStroke = StrokeStyle(lineWidth: stroke, lineCap: .round)
 
-        for (direction, waves) in [(CGFloat(1), leftWaves), (CGFloat(-1), rightWaves)] {
-            let edgeX = direction > 0 ? CGFloat(0) : width
-            for wave in waves {
-                let progress = (t + wave.offset).truncatingRemainder(dividingBy: 1)
-                let x = edgeX + direction * CGFloat(progress) * width * 0.5
-                // Born at the rim, dead at the center — the fade-ins keep
-                // the birth at the edge soft, the fade-outs let the two
-                // fronts dissolve into each other where they meet.
-                let alpha = min(progress * 5, 1) * min((1 - progress) * 6, 1)
-                let y = height / 2
-                    + CGFloat(sin(progress * .pi * wave.yFreq + wave.yPhase)) * height * 0.15
-                let radius = height * 0.38
-                let rect = CGRect(
-                    x: x - radius, y: y - radius, width: radius * 2, height: radius * 2
-                )
-                context.fill(
-                    Path(ellipseIn: rect),
-                    with: .radialGradient(
-                        Gradient(colors: [
-                            wave.color.opacity(0.85 * alpha),
-                            wave.color.opacity(0),
-                        ]),
-                        center: CGPoint(x: x, y: y),
-                        startRadius: 0,
-                        endRadius: radius
-                    )
-                )
+        func wavePath(from x0: CGFloat, to x1: CGFloat, amplitude amp: CGFloat) -> Path {
+            var path = Path()
+            var x = x0
+            // Start on the curve, not on the center line — otherwise the
+            // left end bends towards the middle.
+            var y = centerY + amp * CGFloat(sin(2 * .pi * (x + phasePx) / wavelength))
+            path.move(to: CGPoint(x: x, y: y))
+            let step = wavelength / 16
+            while x < x1 {
+                x = min(x + step, x1)
+                y = centerY + amp * CGFloat(sin(2 * .pi * (x + phasePx) / wavelength))
+                path.addLine(to: CGPoint(x: x, y: y))
             }
+            return path
+        }
+
+        func flatTrack(from x0: CGFloat, to x1: CGFloat) {
+            guard x1 - x0 > inset else { return }
+            var path = Path()
+            path.move(to: CGPoint(x: max(x0, inset), y: centerY))
+            path.addLine(to: CGPoint(x: min(x1, width - inset), y: centerY))
+            context.stroke(path, with: .color(trackColor), style: wavyStroke)
+        }
+
+        if fill >= 0.999 {
+            // All wave, all the way across.
+            context.stroke(
+                wavePath(from: 0, to: width, amplitude: amplitude),
+                with: .color(color),
+                style: wavyStroke
+            )
+        } else if fill <= 0.001 {
+            // Drained: the flat track alone.
+            flatTrack(from: 0, to: width)
+        } else if draining {
+            // The wave retreats to the right and exits at the right edge.
+            let left = width * (1 - fill)
+            flatTrack(from: 0, to: left - gap)
+            context.stroke(
+                wavePath(from: left, to: width, amplitude: amplitude),
+                with: .color(color),
+                style: wavyStroke
+            )
+        } else {
+            // Filling up from the left, the track behind it.
+            let right = width * fill
+            flatTrack(from: right + gap, to: width)
+            context.stroke(
+                wavePath(from: 0, to: right, amplitude: amplitude),
+                with: .color(color),
+                style: wavyStroke
+            )
         }
     }
 }

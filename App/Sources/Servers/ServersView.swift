@@ -341,7 +341,7 @@ private struct SubscriptionCard: View {
         GeometryReader { geo in
             ZStack(alignment: .leading) {
                 Capsule()
-                    .fill(Color.primary.opacity(0.1))
+                    .fill(Chumpy.secondaryContainer)
                 Capsule()
                     .fill(usedRatio > 0.9 ? Color.red : Chumpy.accent)
                     .frame(width: max(geo.size.width * usedRatio, 4))
@@ -431,7 +431,7 @@ private struct ServerGroupRow: View {
             bottomLeft: isLast ? Chumpy.cardRadius : Chumpy.innerRadius,
             bottomRight: isLast ? Chumpy.cardRadius : Chumpy.innerRadius
         )
-        .fill(isSelected ? Chumpy.primaryContainer : Color.primary.opacity(0.055))
+        .fill(isSelected ? Chumpy.primaryContainer : Chumpy.surfaceContainer)
         .animation(.easeInOut(duration: 0.18), value: isSelected)
     }
 
@@ -439,15 +439,15 @@ private struct ServerGroupRow: View {
         HStack(spacing: 16) {
             tile
 
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: 3) {
                 HStack(alignment: .firstTextBaseline, spacing: 0) {
                     Text(title)
-                        .font(.system(size: 16, weight: .medium))
+                        .font(.system(size: 17, weight: .semibold))
                         .lineLimit(1)
                         .truncationMode(.middle)
                     if let pingText {
                         Text("  ·  \(pingText)")
-                            .font(.system(size: 13))
+                            .font(.system(size: 14))
                             .lineLimit(1)
                             .foregroundStyle(pingColor)
                     }
@@ -468,8 +468,8 @@ private struct ServerGroupRow: View {
             }
         }
         .padding(.horizontal, 16)
-        .padding(.vertical, 8)
-        .frame(minHeight: 72)
+        .padding(.vertical, 14)
+        .frame(minHeight: 80)
         .contentShape(Rectangle())
         .onTapGesture {
             // A concealed row stands where it always stood but stays out
@@ -478,24 +478,24 @@ private struct ServerGroupRow: View {
         }
     }
 
-    /// The round 40pt tile: tonal, the accent's own fill when picked — the
+    /// The round 44pt tile: tonal, the accent's own fill when picked — the
     /// flag rides the slot, names without one keep the globe, balancers
     /// keep the explore compass.
     private var tile: some View {
         ZStack {
             Circle()
                 .fill(isSelected ? Chumpy.accent : Chumpy.secondaryContainer)
-                .frame(width: 40, height: 40)
+                .frame(width: 44, height: 44)
             if let flag = leadingFlagEmoji {
                 Text(flag)
-                    .font(.system(size: 20))
+                    .font(.system(size: 22))
             } else if profile.type == .balancer {
                 Image(systemName: "safari")
-                    .font(.system(size: 17, weight: .medium))
+                    .font(.system(size: 18, weight: .medium))
                     .foregroundStyle(isSelected ? Color.white : Color.accentColor)
             } else {
                 Image(systemName: "globe")
-                    .font(.system(size: 17, weight: .regular))
+                    .font(.system(size: 18, weight: .regular))
                     .foregroundStyle(isSelected ? Color.white : Color.accentColor)
             }
         }
@@ -711,10 +711,10 @@ private struct SubscriptionChooserSheet: View {
                 }
             }
             .padding(16)
-            .frame(minHeight: 64)
+            .frame(minHeight: 72)
             .background(
                 RoundedRectangle(cornerRadius: 20, style: .continuous)
-                    .fill(isSelected ? Chumpy.primaryContainer : Chumpy.surfaceContainerLow)
+                    .fill(isSelected ? Chumpy.primaryContainer : Chumpy.surfaceContainer)
             )
         }
         .buttonStyle(.plain)
@@ -744,10 +744,10 @@ private struct SubscriptionChooserSheet: View {
             .tint(Chumpy.accent)
         }
         .padding(16)
-        .frame(minHeight: 64)
+        .frame(minHeight: 72)
         .background(
             RoundedRectangle(cornerRadius: 20, style: .continuous)
-                .fill(Chumpy.surfaceContainerLow)
+                .fill(Chumpy.surfaceContainer)
         )
     }
 
@@ -773,10 +773,10 @@ private struct SubscriptionChooserSheet: View {
                 Spacer()
             }
             .padding(16)
-            .frame(minHeight: 64)
+            .frame(minHeight: 72)
             .background(
                 RoundedRectangle(cornerRadius: 20, style: .continuous)
-                    .fill(Chumpy.surfaceContainerLow)
+                    .fill(Chumpy.surfaceContainer)
             )
         }
         .buttonStyle(.plain)
@@ -802,10 +802,10 @@ private struct SubscriptionChooserSheet: View {
                     .foregroundStyle(Color.secondary)
             }
             .padding(16)
-            .frame(minHeight: 64)
+            .frame(minHeight: 72)
             .background(
                 RoundedRectangle(cornerRadius: 20, style: .continuous)
-                    .fill(Chumpy.surfaceContainerLow)
+                    .fill(Chumpy.surfaceContainer)
             )
         }
         .buttonStyle(.plain)

@@ -7,21 +7,21 @@ import SwiftUI
 enum Chumpy {
     static let accent = Color("AccentColor")
 
-    // MARK: Chumpy tonal surfaces
-    // The Android client leans on M3 tonal containers; on iOS the same
-    // layers come from translucent primary fills that ride whatever
-    // backdrop is underneath — dark mode included, no per-scheme tables.
+    // MARK: iOS system shades
+    // The Android client leans on M3 tonal containers; here the same slots
+    // wear the platform's own fills instead — system grays and the tint's
+    // own selection fill, dark mode included for free.
 
-    /// M3 `surfaceContainerLow` — the quiet chip container.
-    static let surfaceContainerLow = Color.primary.opacity(0.055)
-    /// M3 `surfaceContainer` — the card and bar surface.
-    static let surfaceContainer = Color.primary.opacity(0.075)
-    /// M3 `secondaryContainer` — the tonal accent container (tiles, indicators).
-    static let secondaryContainer = Color.accentColor.opacity(0.16)
-    /// M3 `primaryContainer` — the selected row's own paint.
-    static let primaryContainer = Color.accentColor.opacity(0.22)
-    /// M3 `errorContainer`.
-    static let errorContainer = Color.red.opacity(0.14)
+    /// Chips and quiet fills: `quaternarySystemFill`.
+    static let surfaceContainerLow = Color(.quaternarySystemFill)
+    /// Cards and grouped rows: the grouped-list background.
+    static let surfaceContainer = Color(.secondarySystemGroupedBackground)
+    /// Tiles, indicators, the idle connect base: `tertiarySystemFill`.
+    static let secondaryContainer = Color(.tertiarySystemFill)
+    /// The selected row's own paint: the tint's selection fill.
+    static let primaryContainer = Color.accentColor.opacity(0.12)
+    /// The error fill.
+    static let errorContainer = Color.red.opacity(0.12)
 
     /// The Chumpy card corner — M3 `extraLarge`, 28dp.
     static let cardRadius: CGFloat = 28
@@ -64,7 +64,7 @@ extension View {
                 bottomLeft: bottom ? Chumpy.cardRadius : Chumpy.innerRadius,
                 bottomRight: bottom ? Chumpy.cardRadius : Chumpy.innerRadius
             )
-            .fill(Color.primary.opacity(0.055))
+            .fill(Chumpy.surfaceContainer)
         )
     }
 }
