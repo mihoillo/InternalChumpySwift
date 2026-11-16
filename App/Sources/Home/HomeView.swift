@@ -362,89 +362,114 @@ struct ServerCard: View {
 
 // MARK: - Liquid connect bar
 
-/// The connect button's own glass: Siri-style color refraction — a handful
-/// of glowing color blobs drifting through the capsule on lissajous paths,
-/// composited `plusLighter` over the base so they read as light bending in
-/// liquid glass. Idle the glass stays calm and dim; connected the light
-/// comes up at full strength. The blobs always drift at one constant speed,
-/// so the motion never jumps when the state flips — only the brightness
-/// animates, which SwiftUI does natively.
+/// The connect button's own glass. The color rides under the glass, not on
+/// it: two streams of soft color waves enter from the left and right edges —
+/// the refraction at the rim — and travel toward the center, wobbling as
+/// they go, brightening where they meet. Over them stands the glass itself:
+/// stock Liquid Glass on iOS 26, plain frosted matte below — the waves read
+/// through the material the way light reads through frosted glass.
+///
+/// The waves always drift at one constant speed, so the motion never jumps
+/// when the state flips — only the intensity animates, which SwiftUI does
+/// natively: dim while idle, full strength once the tunnel stands.
 struct LiquidConnectBar: View {
     let isUp: Bool
 
-    private struct Blob {
+    private struct Wave {
         let color: Color
-        let fx: Double
-        let fy: Double
-        let px: Double
-        let py: Double
-        let radius: CGFloat
+        /// Where in the loop this wave stands, 0…1.
+        let offset: Double
+        /// The vertical wobble's own frequency and phase.
+        let yFreq: Double
+        let yPhase: Double
     }
 
-    /// The palette the glass refracts: the accent plus its neighbors, with a
-    /// white specular riding along.
-    private let blobs: [Blob] = [
-        Blob(color: Chumpy.accent, fx: 0.90, fy: 1.30, px: 0.0, py: 1.7, radius: 0.90),
-        Blob(color: .purple, fx: 1.10, fy: 0.70, px: 2.1, py: 4.2, radius: 1.00),
-        Blob(color: .pink, fx: 0.60, fy: 1.70, px: 3.9, py: 0.6, radius: 0.80),
-        Blob(color: .teal, fx: 1.40, fy: 0.90, px: 5.0, py: 2.8, radius: 0.85),
-        Blob(color: .blue, fx: 0.80, fy: 1.10, px: 1.2, py: 5.5, radius: 0.95),
-        Blob(color: .white, fx: 1.20, fy: 1.50, px: 4.4, py: 3.3, radius: 0.45),
+    /// The left stream's palette and the right's — different hues per side
+    /// so the two fronts read as two refractions meeting.
+    private let leftWaves: [Wave] = [
+        Wave(color: Chumpy.accent, offset: 0.00, yFreq: 3, yPhase: 0.0),
+        Wave(color: .teal, offset: 0.33, yFreq: 4, yPhase: 1.3),
+        Wave(color: .purple, offset: 0.66, yFreq: 3, yPhase: 2.6),
+    ]
+    private let rightWaves: [Wave] = [
+        Wave(color: .pink, offset: 0.16, yFreq: 3, yPhase: 0.7),
+        Wave(color: .blue, offset: 0.50, yFreq: 4, yPhase: 2.0),
+        Wave(color: .orange, offset: 0.83, yFreq: 3, yPhase: 4.1),
     ]
 
     var body: some View {
         ZStack {
-            Capsule()
-                .fill(baseColor)
-
             TimelineView(.animation(minimumInterval: 1.0 / 30)) { timeline in
                 Canvas { context, size in
-                    // Light composites as light: the blobs add onto the base
-                    // the way glow adds in glass.
-                    context.blendMode = .plusLighter
-                    let t = timeline.date.timeIntervalSinceReferenceDate * 0.7
-                    for blob in blobs {
-                        let x = size.width * (0.5 + 0.38 * CGFloat(sin(t * blob.fx + blob.px)))
-                        let y = size.height * (0.5 + 0.55 * CGFloat(sin(t * blob.fy + blob.py)))
-                        let r = size.height * blob.radius
-                        let rect = CGRect(x: x - r, y: y - r, width: r * 2, height: r * 2)
-                        context.fill(
-                            Path(ellipseIn: rect),
-                            with: .radialGradient(
-                                Gradient(colors: [blob.color.opacity(0.55), blob.color.opacity(0)]),
-                                center: CGPoint(x: x, y: y),
-                                startRadius: 0,
-                                endRadius: r
-                            )
-                        )
-                    }
+                    draw(timeline: timeline, size: size, context: context)
                 }
-                .blur(radius: 10)
+                .blur(radius: 6)
             }
             // Idle the refraction stays a quiet undertone; connected it
             // comes up to full strength.
-            .opacity(isUp ? 1.0 : 0.35)
+            .opacity(isUp ? 1.0 : 0.38)
 
-            // The glass's own edge: a hairline rim and the specular the
-            // light leaves along the top.
-            Capsule()
-                .strokeBorder(Color.white.opacity(0.22), lineWidth: 1)
-            Capsule()
-                .fill(
-                    LinearGradient(
-                        colors: [.white.opacity(0.16), .clear],
-                        startPoint: .top,
-                        endPoint: .center
-                    )
-                )
+            glassLayer
         }
         .clipShape(Capsule())
         .animation(.easeInOut(duration: 0.7), value: isUp)
     }
 
-    /// Connected the glass darkens so the light in it carries the state;
-    /// idle it keeps the calm tonal surface.
-    private var baseColor: Color {
-        isUp ? Color.black.opacity(0.45) : Chumpy.surfaceContainer
+    /// The glass itself: stock Liquid Glass on iOS 26, plain frosted matte
+    /// below — no painted rims, no fake speculars.
+    @ViewBuilder
+    private var glassLayer: some View {
+        #if compiler(>=6.2)
+        if #available(iOS 26.0, *) {
+            Color.clear.glassEffect(in: Capsule())
+        } else {
+            Capsule().fill(.regularMaterial)
+        }
+        #else
+        Capsule().fill(.regularMaterial)
+        #endif
+    }
+
+    /// One wave's whole run: born at its edge, gliding to the center,
+    /// wobbling on its own frequency, fading out as the two fronts meet.
+    private func draw(timeline: TimelineViewDefaultContext, size: CGSize, context: GraphicsContext) {
+        // Light composites as light: the waves add onto each other where
+        // they overlap — the meeting point at the center glows.
+        context.blendMode = .plusLighter
+        let width = size.width
+        let height = size.height
+        // One edge-to-center run takes ~2.8 s; three waves per side keep a
+        // front arriving roughly every second.
+        let t = timeline.date.timeIntervalSinceReferenceDate * 0.35
+
+        for (direction, waves) in [(CGFloat(1), leftWaves), (CGFloat(-1), rightWaves)] {
+            let edgeX = direction > 0 ? CGFloat(0) : width
+            for wave in waves {
+                let progress = (t + wave.offset).truncatingRemainder(dividingBy: 1)
+                let x = edgeX + direction * CGFloat(progress) * width * 0.5
+                // Born at the rim, dead at the center — the fade-ins keep
+                // the birth at the edge soft, the fade-outs let the two
+                // fronts dissolve into each other where they meet.
+                let alpha = min(progress * 5, 1) * min((1 - progress) * 6, 1)
+                let y = height / 2
+                    + CGFloat(sin(progress * .pi * wave.yFreq + wave.yPhase)) * height * 0.15
+                let radius = height * 0.38
+                let rect = CGRect(
+                    x: x - radius, y: y - radius, width: radius * 2, height: radius * 2
+                )
+                context.fill(
+                    Path(ellipseIn: rect),
+                    with: .radialGradient(
+                        Gradient(colors: [
+                            wave.color.opacity(0.85 * alpha),
+                            wave.color.opacity(0),
+                        ]),
+                        center: CGPoint(x: x, y: y),
+                        startRadius: 0,
+                        endRadius: radius
+                    )
+                )
+            }
+        }
     }
 }
