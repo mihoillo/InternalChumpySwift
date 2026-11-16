@@ -68,56 +68,132 @@ extension View {
     }
 }
 
-/// Rounded rect with per-corner radii, continuous where the platform allows.
+/// Rounded rect with per-corner radii wearing the platform's own
+/// continuous-corner character — the construction Figma reverse-
+/// engineered from the iOS squircle: every corner keeps a circular arc
+/// at its heart with cubic Bézier shoulders easing the curvature in
+/// from the straight edges (smoothing 0.6, the value that matches the
+/// iOS shape), so the grouped rows wear the same corners the cards do
+/// instead of the plain circular arcs of a common rounded rect.
 struct UnevenCornerShape: Shape {
     var topLeft: CGFloat
     var topRight: CGFloat
     var bottomLeft: CGFloat
     var bottomRight: CGFloat
 
-    func path(in rect: CGRect) -> Path {
-        var path = Path()
-        let minDimension = min(rect.width, rect.height)
-        let tl = min(topLeft, minDimension / 2)
-        let tr = min(topRight, minDimension / 2)
-        let bl = min(bottomLeft, minDimension / 2)
-        let br = min(bottomRight, minDimension / 2)
+    /// Zero is the plain rounded rect; 0.6 is the iOS squircle.
+    private static let smoothing: CGFloat = 0.6
 
-        path.move(to: CGPoint(x: rect.minX + tl, y: rect.minY))
-        path.addLine(to: CGPoint(x: rect.maxX - tr, y: rect.minY))
-        path.addArc(
-            center: CGPoint(x: rect.maxX - tr, y: rect.minY + tr),
-            radius: tr,
-            startAngle: .degrees(-90),
-            endAngle: .degrees(0),
-            clockwise: false
-        )
-        path.addLine(to: CGPoint(x: rect.maxX, y: rect.maxY - br))
-        path.addArc(
-            center: CGPoint(x: rect.maxX - br, y: rect.maxY - br),
-            radius: br,
-            startAngle: .degrees(0),
-            endAngle: .degrees(90),
-            clockwise: false
-        )
-        path.addLine(to: CGPoint(x: rect.minX + bl, y: rect.maxY))
-        path.addArc(
-            center: CGPoint(x: rect.minX + bl, y: rect.maxY - bl),
-            radius: bl,
-            startAngle: .degrees(90),
-            endAngle: .degrees(180),
-            clockwise: false
-        )
-        path.addLine(to: CGPoint(x: rect.minX, y: rect.minY + tl))
-        path.addArc(
-            center: CGPoint(x: rect.minX + tl, y: rect.minY + tl),
-            radius: tl,
-            startAngle: .degrees(180),
-            endAngle: .degrees(270),
-            clockwise: false
-        )
+    func path(in rect: CGRect) -> Path {
+        let half = min(rect.width, rect.height) / 2
+        let tl = min(topLeft, half)
+        let tr = min(topRight, half)
+        let bl = min(bottomLeft, half)
+        let br = min(bottomRight, half)
+
+        // The whole footprint a corner consumes of an edge: its radius
+        // plus the smoothing's reach along the straight.
+        var pTL = tl * (1 + Self.smoothing)
+        var pTR = tr * (1 + Self.smoothing)
+        var pBL = bl * (1 + Self.smoothing)
+        var pBR = br * (1 + Self.smoothing)
+        // Every edge is shared by two corners; when both footprints
+        // together outrun the edge, both ease their smoothing off until
+        // they exactly meet in the middle — the capsule law.
+        share(&pTL, &pTR, rect.width)
+        share(&pTR, &pBR, rect.height)
+        share(&pBL, &pBR, rect.width)
+        share(&pTL, &pBL, rect.height)
+
+        var path = Path()
+        path.move(to: CGPoint(x: rect.minX + pTL, y: rect.minY))
+        corner(&path, apex: CGPoint(x: rect.maxX, y: rect.minY),
+               e1: CGPoint(x: 1, y: 0), e2: CGPoint(x: 0, y: 1),
+               radius: tr, footprint: pTR)
+        corner(&path, apex: CGPoint(x: rect.maxX, y: rect.maxY),
+               e1: CGPoint(x: 0, y: 1), e2: CGPoint(x: -1, y: 0),
+               radius: br, footprint: pBR)
+        corner(&path, apex: CGPoint(x: rect.minX, y: rect.maxY),
+               e1: CGPoint(x: -1, y: 0), e2: CGPoint(x: 0, y: -1),
+               radius: bl, footprint: pBL)
+        corner(&path, apex: CGPoint(x: rect.minX, y: rect.minY),
+               e1: CGPoint(x: 0, y: -1), e2: CGPoint(x: 1, y: 0),
+               radius: tl, footprint: pTL)
         path.closeSubpath()
         return path
+    }
+
+    /// Two corners share one edge; when their footprints together
+    /// outrun it, both shrink proportionally to exactly meet.
+    private func share(_ a: inout CGFloat, _ b: inout CGFloat, _ length: CGFloat) {
+        let total = a + b
+        guard total > length, total > 0 else { return }
+        a = a * length / total
+        b = b * length / total
+    }
+
+    /// One corner: the straight edge ends at the footprint short of the
+    /// apex, a Bézier shoulder eases into the corner's own arc, and a
+    /// second shoulder eases back out to the other edge.
+    private func corner(
+        _ path: inout Path,
+        apex: CGPoint,
+        e1: CGPoint,
+        e2: CGPoint,
+        radius: CGFloat,
+        footprint: CGFloat
+    ) {
+        guard radius > 0 else {
+            path.addLine(to: apex)
+            return
+        }
+        let s = max(0, min(Self.smoothing, footprint / radius - 1))
+        let r = radius
+        let p = r * (1 + s)                    // the edge the corner eats
+        let arc = 90 * (1 - s) * .pi / 180     // the arc that remains
+        let tilt = 45 * s * .pi / 180           // the shoulders' tilt
+        let chord = sin(arc / 2) * r * CGFloat(2).squareRoot() // the arc's span per edge
+        let handle = r * tan(tilt / 2)         // the arc joint's handle
+        let c = handle * cos(tilt)             // its share along the incoming edge
+        let d = handle * sin(tilt)             // its share along the outgoing edge
+        let b = (p - chord - c - d) / 3         // the easing, split two to one
+        let a = 2 * b
+
+        // The corner in its own frame: the origin where the straight
+        // ends, u along the incoming edge, v along the outgoing one.
+        let start = CGPoint(x: apex.x - p * e1.x, y: apex.y - p * e1.y)
+        func spot(_ u: CGFloat, _ v: CGFloat) -> CGPoint {
+            CGPoint(x: start.x + u * e1.x + v * e2.x,
+                    y: start.y + u * e1.y + v * e2.y)
+        }
+        let arcStart = spot(a + b + c, d)
+        let arcEnd = spot(a + b + c + chord, d + chord)
+
+        path.addLine(to: start)
+        if s > 0.01 {
+            path.addCurve(
+                to: arcStart,
+                control1: spot(a, 0),
+                control2: spot(a + b, 0)
+            )
+        }
+        let center = CGPoint(x: apex.x - r * e1.x + r * e2.x,
+                             y: apex.y - r * e1.y + r * e2.y)
+        let theta = atan2(arcStart.y - center.y, arcStart.x - center.x)
+        path.addArc(
+            center: center,
+            radius: r,
+            startAngle: .radians(theta),
+            endAngle: .radians(theta + arc),
+            clockwise: false
+        )
+        if s > 0.01 {
+            path.addCurve(
+                to: spot(a + b + c + chord + d, d + chord + a + b + c),
+                control1: spot(a + b + c + chord + d, d + chord + c),
+                control2: spot(a + b + c + chord + d, d + chord + b + c)
+            )
+        }
     }
 }
 

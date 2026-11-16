@@ -607,12 +607,14 @@ private struct ServerGroupRow: View {
         }
     }
 
-    /// The square 40pt tile with a 10pt corner: white-tinted over the
-    /// accent plate, tonal at rest — the flag rides the slot, names
-    /// without one keep the globe, balancers keep the explore compass.
+    /// The square 40pt tile with a 12pt corner — concentric with the
+    /// group's own 28pt one (28 − 16 inset = 12), so the two roundings
+    /// nest into each other the iOS way: white-tinted over the accent
+    /// plate, tonal at rest. The flag rides the slot, names without
+    /// one keep the globe, balancers keep the explore compass.
     private var tile: some View {
         ZStack {
-            RoundedRectangle(cornerRadius: 10, style: .continuous)
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
                 .fill(isSelected ? Color.white.opacity(0.16) : Chumpy.secondaryContainer)
                 .frame(width: 40, height: 40)
             if let flag = leadingFlagEmoji {
@@ -794,7 +796,7 @@ private struct SubscriptionChooserSheet: View {
 
         return HStack(spacing: 16) {
             ZStack {
-                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
                     .fill(isSelected ? Color.white.opacity(0.16) : Chumpy.secondaryContainer)
                     .frame(width: 40, height: 40)
                 Image(systemName: "externaldrive.fill")
@@ -846,7 +848,7 @@ private struct SubscriptionChooserSheet: View {
     private var addRow: some View {
         HStack(spacing: 16) {
             ZStack {
-                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
                     .fill(Chumpy.secondaryContainer)
                     .frame(width: 40, height: 40)
                 Image(systemName: "plus")
