@@ -55,7 +55,11 @@ struct HomeView: View {
             connectButton
         }
         .padding(.horizontal, 20)
-        .padding(.bottom, 88)
+        // The connect button's floor: 16pt clear of the bar's top edge —
+        // the same air the buttons keep between themselves (the bar
+        // stands 12pt above the safe area and runs 64pt tall, so 76 +
+        // 16 lands the button 16pt off the bar).
+        .padding(.bottom, 92)
         .onReceive(ticker) { now = $0 }
         .onAppear { startLiveDelayIfUp() }
         .onChange(of: appState.status) { _ in startLiveDelayIfUp() }

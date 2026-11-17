@@ -471,7 +471,7 @@ extension View {
         overlay(
             Capsule().strokeBorder(Color.primary.opacity(0.06), lineWidth: 0.5)
         )
-        .shadow(color: .black.opacity(0.16), radius: 16, y: 8)
+        .shadow(color: .black.opacity(0.10), radius: 12, y: 6)
     }
 }
 

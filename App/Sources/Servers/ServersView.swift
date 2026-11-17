@@ -610,13 +610,16 @@ private struct ServerGroupRow: View {
     /// The row's own paint, riding behind the content as its background —
     /// its slice of the group's one card: the card's own shape (the
     /// subscription card's very shape) grown toward the group's inside
-    /// and cut back to the row's bounds. The resting row wears the
-    /// native frost; the selected one the accent's own solid plate —
-    /// never a transparent wash. The layers crossfade, for a style swap
-    /// animates between styles that don't blend and renders black.
+    /// and cut back to the row's bounds. The resting row wears the flat
+    /// quiet fill — the frost is gone from the rows, for the material
+    /// carries its own white gradient sheen that read as a glow over
+    /// every row's top; the rows stay flat. The selected one wears the
+    /// accent's own solid plate — never a transparent wash. The layers
+    /// crossfade, for a style swap animates between styles that don't
+    /// blend and renders black.
     private var rowFill: some View {
         ZStack {
-            rowSlice.fill(.regularMaterial)
+            rowSlice.fill(Chumpy.surfaceContainerLow)
             rowSlice.fill(Chumpy.accent)
                 .opacity(isSelected ? 1 : 0)
         }
@@ -637,20 +640,20 @@ private struct ServerGroupRow: View {
     private var glow: some View {
         VStack(spacing: 0) {
             LinearGradient(
-                colors: [Chumpy.accent.opacity(0.14), .clear],
+                colors: [Chumpy.accent.opacity(0.08), .clear],
                 startPoint: .top,
                 endPoint: .bottom
             )
-            .frame(height: 24)
+            .frame(height: 20)
             .opacity(glowsFromTop ? 1 : 0)
             .animation(.easeInOut(duration: 0.18), value: glowsFromTop)
             Spacer(minLength: 0)
             LinearGradient(
-                colors: [Chumpy.accent.opacity(0.14), .clear],
+                colors: [Chumpy.accent.opacity(0.08), .clear],
                 startPoint: .bottom,
                 endPoint: .top
             )
-            .frame(height: 24)
+            .frame(height: 20)
             .opacity(glowsFromBottom ? 1 : 0)
             .animation(.easeInOut(duration: 0.18), value: glowsFromBottom)
         }
@@ -982,10 +985,11 @@ private struct SubscriptionChooserSheet: View {
     /// The row's own paint — its slice of the group's one card: the
     /// card's own shape (the subscription card's very shape) grown
     /// toward the group's inside and cut back to the row's bounds. The
-    /// native frost at rest, the accent's solid plate when standing.
+    /// flat quiet fill at rest — no frost, no gradient sheen — the
+    /// accent's solid plate when standing.
     private func rowFill(isFirst: Bool, isLast: Bool, isSelected: Bool) -> some View {
         ZStack {
-            CardSliceShape(top: isFirst, bottom: isLast).fill(.regularMaterial)
+            CardSliceShape(top: isFirst, bottom: isLast).fill(Chumpy.surfaceContainerLow)
             CardSliceShape(top: isFirst, bottom: isLast).fill(Chumpy.accent)
                 .opacity(isSelected ? 1 : 0)
         }

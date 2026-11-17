@@ -1,18 +1,15 @@
 import SwiftUI
 
-/// The app shell: full-screen content with Chumpy's two-pill floating bar —
-/// the tabs' pill on the left, the round gear button on the right. Ported
-/// from the Android client's `FloatingBottomBar`: Liquid Glass on iOS 26,
-/// frosted material below. The pages ride one horizontal deck — a swipe
-/// deals it under the finger, the bar's buttons scroll it along the same
-/// spine, page over page. The indicator slides between the tabs, the gear
-/// turns on its own hinge.
+/// The app shell: full-screen content with Chumpy's floating bar — the
+/// iOS 26 way, the way the original client's own tab row wore it: one
+/// glass capsule, the four tabs as icons alone, settings among them,
+/// the selection a glass capsule gliding between the equal slots — under
+/// the finger with the swipe, on the shared spring with the settle. The
+/// pages ride one horizontal deck — a swipe deals it under the finger,
+/// the bar's buttons scroll it along the same spine, page over page.
 struct MainShellView: View {
     @EnvironmentObject private var appState: AppState
     @State private var page: Page = .home
-    /// The tab the gear folds back to — the last one that stood.
-    @State private var lastTab: Tab = .home
-    @Namespace private var tabNamespace
 
     /// The live page's scroll, by tag: every page keeps its own word
     /// in the reporter, so the frost knows the page's stance the moment
@@ -21,7 +18,7 @@ struct MainShellView: View {
     @ObservedObject private var scrollReporter = ScrollReporter.shared
 
     enum Tab: Int, CaseIterable, Identifiable {
-        case home, servers, stats
+        case home, servers, stats, settings
 
         var id: Int { rawValue }
 
@@ -30,6 +27,7 @@ struct MainShellView: View {
             case .home: return "house"
             case .servers: return "square.stack.3d.up"
             case .stats: return "chart.bar"
+            case .settings: return "gearshape"
             }
         }
 
@@ -38,14 +36,7 @@ struct MainShellView: View {
             case .home: return "house.fill"
             case .servers: return "square.stack.3d.up.fill"
             case .stats: return "chart.bar.fill"
-            }
-        }
-
-        var titleKey: LocalizedStringKey {
-            switch self {
-            case .home: return "tab.home"
-            case .servers: return "tab.servers"
-            case .stats: return "tab.stats"
+            case .settings: return "gearshape.fill"
             }
         }
     }
@@ -58,11 +49,6 @@ struct MainShellView: View {
     /// swipe settles on it once the finger lets go, the bar's buttons
     /// scroll the deck across it, page over page.
     private let deckMotion = Animation.spring(response: 0.45, dampingFraction: 0.85)
-
-    /// The bar's own spring — snappier than the page's, with a bit of
-    /// bounce, so the bar reads as its own navigation object, not a part
-    /// of the page beneath it.
-    private let barMotion = Animation.spring(response: 0.34, dampingFraction: 0.72)
 
     /// How tall the frost runs from the bar's edge — exactly the bar's
     /// own zone: its height plus its lift above the home indicator, so
@@ -166,7 +152,7 @@ struct MainShellView: View {
                     .transition(.opacity)
             }
 
-            bar
+            tabsPill
                 .padding(.horizontal, 16)
                 .padding(.bottom, 12)
                 .zIndex(1)
@@ -280,9 +266,9 @@ struct MainShellView: View {
     }
 
     private func openTab(_ tab: Tab) {
-        guard Page(tab: tab) != page else { return }
-        lastTab = tab
-        rideDeck(to: Page(tab: tab))
+        let target = Page(tab: tab)
+        guard target != page else { return }
+        rideDeck(to: target)
     }
 
     // MARK: - The deck's settler
@@ -333,64 +319,69 @@ struct MainShellView: View {
             deckPosition = CGFloat(target.rawValue)
             page = target
         }
-        if let tab = Tab(rawValue: target.rawValue) {
-            lastTab = tab
-        }
     }
 
-    // MARK: - The two-pill bar
+    // MARK: - The bar
 
-    private var bar: some View {
-        HStack(spacing: 12) {
-            tabsPill
-            gearButton
-        }
-    }
-
-    /// The tabs' own pill: the active tab wears its icon and label on a
-    /// tonal indicator that slides between the slots; the inactive ones
-    /// keep their icons alone. Everything on the bar's own spring.
+    /// The bar the iOS 26 way: one glass capsule, the four tabs as
+    /// icons alone — the words were the indicator's tether, and the
+    /// system's own bar dropped them for the same reason — with the
+    /// selection as a glass capsule gliding between the equal slots.
+    /// The indicator rides the deck's own position: it travels under
+    /// the finger with the swipe and settles on the same spring the
+    /// pages do, and the icon's tint flips as the glass crosses the
+    /// halfway line, the way the system's own bar reads mid-swipe.
     private var tabsPill: some View {
-        HStack(spacing: 4) {
-            ForEach(Tab.allCases) { tab in
-                tabItem(tab)
+        GeometryReader { geo in
+            let slot = geo.size.width / CGFloat(Tab.allCases.count)
+            ZStack(alignment: .leading) {
+                tabIndicator
+                    .frame(width: slot, height: 48)
+                    .offset(x: deckPosition * slot)
+                HStack(spacing: 0) {
+                    ForEach(Tab.allCases) { tab in
+                        tabItem(tab)
+                    }
+                }
             }
         }
-        .padding(.horizontal, 12)
         .frame(height: 64)
+        .padding(.horizontal, 12)
         .chumpyGlassCapsule()
         .clipShape(Capsule())
         .chumpyPillEdge()
-        // A swipe deals the deck without a button — the indicator must
-        // ride the same spring anyway.
-        .animation(barMotion, value: page)
+    }
+
+    /// The selection's own glass: Liquid Glass on iOS 26 — the inner
+    /// capsule the system's tab bar wears inside its own — the quiet
+    /// tonal fill everywhere below.
+    @ViewBuilder
+    private var tabIndicator: some View {
+        #if compiler(>=6.2)
+        if #available(iOS 26.0, *) {
+            Color.clear.glassEffect(in: Capsule())
+        } else {
+            Capsule().fill(Chumpy.secondaryContainer)
+        }
+        #else
+        Capsule().fill(Chumpy.secondaryContainer)
+        #endif
     }
 
     private func tabItem(_ tab: Tab) -> some View {
-        let isSelected = page == Page(tab: tab)
+        // The tint rides the deck's own position, not the settled
+        // page: the icon lights as the glass crosses the halfway
+        // line, and dims the same way on the ride back.
+        let isSelected = deckPosition.rounded() == CGFloat(tab.rawValue)
 
-        // One live layout, no branch swap: the label unrolls out of the
-        // icon — its measured width and opacity ride the bar's spring,
-        // and the indicator glides between slots underneath.
         return Button {
             openTab(tab)
         } label: {
-            HStack(spacing: 0) {
-                tabIcon(tab, isSelected: isSelected)
-                TabLabel(titleKey: tab.titleKey, isSelected: isSelected)
-            }
-            .padding(.horizontal, isSelected ? 16 : 14)
-            .frame(minWidth: 44, minHeight: 48)
-            .background {
-                if isSelected {
-                    Capsule()
-                        .fill(Chumpy.secondaryContainer)
-                        .matchedGeometryEffect(id: "tab-indicator", in: tabNamespace)
-                }
-            }
-            .foregroundStyle(isSelected ? Color.accentColor : Color.secondary)
+            tabIcon(tab, isSelected: isSelected)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
         .buttonStyle(BarPressStyle())
+        .foregroundStyle(isSelected ? Color.accentColor : Color.secondary)
     }
 
     /// The tab's icon — with the bounce the platform gives symbols on
@@ -398,64 +389,12 @@ struct MainShellView: View {
     @ViewBuilder
     private func tabIcon(_ tab: Tab, isSelected: Bool) -> some View {
         let icon = Image(systemName: isSelected ? tab.activeIcon : tab.icon)
-            .font(.system(size: 17, weight: .medium))
+            .font(.system(size: 18, weight: .medium))
         if #available(iOS 17.0, *) {
             icon.symbolEffect(.bounce, value: isSelected)
         } else {
             icon
         }
-    }
-
-    /// The round gear button — the settings door. It turns a quarter on its
-    /// own hinge as the settings page opens, and wears the same tonal
-    /// indicator the active tab wears.
-    private var gearButton: some View {
-        let onSettings = page == .settings
-
-        return Button {
-            let target: Page = onSettings ? Page(tab: lastTab) : .settings
-            rideDeck(to: target)
-        } label: {
-            Image(systemName: "gearshape.fill")
-                .font(.system(size: 20, weight: .medium))
-                .frame(width: 64, height: 64)
-                .background(Circle().fill(onSettings ? Chumpy.secondaryContainer : .clear))
-                .foregroundStyle(onSettings ? Color.accentColor : Color.secondary)
-                .rotationEffect(.degrees(onSettings ? 90 : 0))
-                .animation(barMotion, value: onSettings)
-        }
-        .buttonStyle(BarPressStyle())
-        .frame(width: 64, height: 64)
-        .chumpyGlassCapsule()
-        .clipShape(Circle())
-        .chumpyPillEdge()
-    }
-}
-
-/// The bar's label: measured once, then unrolled on the spring — the
-/// frame width animates between the fold and the real text width, so the
-/// word slides out of the icon instead of popping in.
-private struct TabLabel: View {
-    let titleKey: LocalizedStringKey
-    let isSelected: Bool
-
-    /// The label's natural width, read once on first layout.
-    @State private var textWidth: CGFloat?
-
-    var body: some View {
-        Text(titleKey)
-            .font(.system(size: 14, weight: .medium))
-            .fixedSize()
-            .background {
-                GeometryReader { geo in
-                    Color.clear
-                        .onAppear { textWidth = geo.size.width }
-                }
-            }
-            .frame(width: isSelected ? (textWidth ?? 0) : 0, alignment: .leading)
-            .clipped()
-            .padding(.leading, isSelected ? 5 : 0)
-            .opacity(isSelected ? 1 : 0)
     }
 }
 
@@ -532,6 +471,7 @@ extension MainShellView.Page {
         case .home: self = .home
         case .servers: self = .servers
         case .stats: self = .stats
+        case .settings: self = .settings
         }
     }
 }
