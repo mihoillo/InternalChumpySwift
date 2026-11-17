@@ -1,5 +1,4 @@
 import SwiftUI
-import UIKit
 
 /// The app shell: full-screen content with Chumpy's two-pill floating bar —
 /// the tabs' pill on the left, the round gear button on the right. Ported
@@ -216,6 +215,12 @@ struct MainShellView: View {
     /// The spine position the current drag started from.
     @State private var dragAnchor: CGFloat = 0
 
+    /// The travel the finger had already walked when the drag anchored —
+    /// the drag's word starts at its anchor, so a re-anchored drag (the
+    /// watchdog settled under a paused finger) leads on from where the
+    /// deck stands, never a jump by the whole walk.
+    @State private var dragAnchorTravel: CGFloat = 0
+
     /// True once this drag has been read as the deck's — the scroll
     /// views own the vertical drags, and a drag only joins the deck
     /// once its own direction reads horizontal.
@@ -235,13 +240,14 @@ struct MainShellView: View {
                     guard abs(value.translation.width) > abs(value.translation.height) else { return }
                     dragging = true
                     dragAnchor = deckPosition.rounded()
+                    dragAnchorTravel = -value.translation.width / size.width
                     startWatchdog()
                 }
                 lastDragEvent = .now
                 // Left is forward along the spine — the finger drags
                 // the deck, not the position, so the travel is the
-                // translation's mirror.
-                let traveled = -value.translation.width / size.width
+                // translation's mirror, past the anchor's own.
+                let traveled = -value.translation.width / size.width - dragAnchorTravel
                 let available = CGFloat(Page.settings.rawValue)
                 let raw = dragAnchor + traveled
                 // The ends resist: past the first or the last page the
@@ -254,7 +260,7 @@ struct MainShellView: View {
                 guard dragging else { return }
                 dragging = false
                 watchdogTask?.cancel()
-                let traveled = -value.translation.width / size.width
+                let traveled = -value.translation.width / size.width - dragAnchorTravel
                 let thrown = -value.velocity.width / size.width * 0.25
                 let raw = dragAnchor + traveled + thrown
                 let available = CGFloat(Page.settings.rawValue)
@@ -288,9 +294,10 @@ struct MainShellView: View {
     /// or cancelled gesture never speaks its onEnded: the deck would
     /// rest between pages with `dragging` stuck true, and the next swipe
     /// would ride a stale anchor. The watchdog listens for the silence:
-    /// once the drag has gone quiet and no finger is down anywhere, the
-    /// gesture is dead — the deck settles on its nearest page on the
-    /// shared spring, and the drag state resets.
+    /// once the drag has gone quiet, the deck settles on its nearest
+    /// page on the shared spring and the drag state resets — and a
+    /// finger merely resting mid-drag is forgiven: its next word
+    /// re-anchors the drag from where the deck settled and leads on.
     @State private var watchdogTask: Task<Void, Never>?
 
     /// When the drag last spoke — every onChanged feeds it.
@@ -304,22 +311,11 @@ struct MainShellView: View {
                 try? await Task.sleep(nanoseconds: 100_000_000)
                 guard dragging, !Task.isCancelled else { return }
                 guard Date.now.timeIntervalSince(lastDragEvent) > 0.35 else { continue }
-                // A finger still down anywhere is a live touch, however
-                // silent — a held finger mid-drag must not be settled
-                // under. Only a truly dead gesture leaves the deck
-                // alone to be walked home.
-                guard !anyFingerDown else { continue }
                 dragging = false
                 settleDeck(to: nearestPage())
                 return
             }
         }
-    }
-
-    /// Is a finger still down on any window — a held touch the drag
-    /// may still belong to. The application's own word, app-wide.
-    private var anyFingerDown: Bool {
-        !(UIApplication.shared.allTouches?.isEmpty ?? true)
     }
 
     /// The page the deck sits closest to — the watchdog's landing spot.
