@@ -317,14 +317,19 @@ struct MainShellView: View {
     }
 
     /// Is a finger still down on any window — a held touch the drag
-    /// may still belong to.
+    /// may still belong to. Written as a plain loop: the chained
+    /// `keyWindow` read compiles to an inference conflict on the
+    /// newest SDKs, and the scenes' own `windows` lists are stable.
     private var anyFingerDown: Bool {
-        UIApplication.shared.connectedScenes
-            .compactMap { ($0 as? UIWindowScene)?.keyWindow }
-            .contains { window in
-                guard let touches = window.allTouches else { return false }
-                return !touches.isEmpty
+        for scene in UIApplication.shared.connectedScenes {
+            guard let windowScene = scene as? UIWindowScene else { continue }
+            for window in windowScene.windows {
+                if let touches = window.allTouches, !touches.isEmpty {
+                    return true
+                }
             }
+        }
+        return false
     }
 
     /// The page the deck sits closest to — the watchdog's landing spot.
