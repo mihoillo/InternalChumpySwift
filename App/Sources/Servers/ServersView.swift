@@ -4,9 +4,10 @@ import ChumpyCore
 
 /// Servers tab, ported from the Android client's `ServersScreen` layout:
 /// the subscription card with the database tile, the centered chips header
-/// (total / expired / concealed / sort), and the grouped rows — slices of
-/// one card, the subscription card's very shape, cut apart by the gaps.
-/// Pull-to-refresh runs the real-ping sweep.
+/// (total / expired / concealed / sort), and the grouped rows — one
+/// continuous card, the subscription card's very shape, its rows divided
+/// by the system's own hairlines; the standing row's light falls softly
+/// onto its neighbors. Pull-to-refresh runs the real-ping sweep.
 struct ServersView: View {
     @EnvironmentObject private var appState: AppState
     @StateObject private var model = ServersViewModel()
@@ -153,13 +154,18 @@ struct ServersView: View {
 
     private var rows: some View {
         let total = model.profiles.count
-        return VStack(spacing: 2) {
+        // The rows butt flush — no gap between them, the way the native
+        // inset lists wear their one continuous card; the seams carry
+        // the hairlines instead.
+        return VStack(spacing: 0) {
             ForEach(Array(model.profiles.enumerated()), id: \.element.id) { index, profile in
                 ServerGroupRow(
                     profile: profile,
                     isFirst: index == 0,
                     isLast: index == total - 1,
                     isSelected: isSelected(profile),
+                    glowsFromTop: index > 0 && isSelected(model.profiles[index - 1]),
+                    glowsFromBottom: index < total - 1 && isSelected(model.profiles[index + 1]),
                     tunnelUp: appState.status == .connected || appState.status == .reasserting,
                     onSelect: { select(profile) },
                     onDelete: { model.deleteManualProfile(profile.id) },
@@ -509,7 +515,8 @@ private struct SubscriptionCard: View {
 /// own bounds. The outer corners are the card's own genuine ones —
 /// never the mixed-radius corner the platform deforms to fit a short
 /// row, which the tile stopped nesting into — and the inner seam is a
-/// straight cut: one card, sliced apart by the gaps.
+/// straight cut: the rows butt flush into one continuous card, the
+/// seam hidden under the hairline.
 private struct CardSliceShape: Shape {
     /// The card's rounded top end lives inside this row's rect.
     var top: Bool
@@ -533,6 +540,19 @@ private struct CardSliceShape: Shape {
     }
 }
 
+/// The system's own divider — the hairline the native inset lists wear
+/// between their rows: half a point of primary at a tenth, set in from
+/// the leading edge past the tile (the text's own 16 + 40 + 16 inset)
+/// and from the trailing one by the card's own margin. It rides above
+/// the seam and stays deaf to touches.
+private var rowHairline: some View {
+    Color.primary.opacity(0.1)
+        .frame(height: 0.5)
+        .padding(.leading, 72)
+        .padding(.trailing, 16)
+        .allowsHitTesting(false)
+}
+
 /// One row of the grouped list: the 72pt-min body, the round 40pt tile
 /// (tonal, accent when picked) with the flag or the globe, the title with
 /// its "· N ms" tail (accent from 200 ms), the protocol/host supporting
@@ -543,6 +563,12 @@ private struct ServerGroupRow: View {
     let isFirst: Bool
     let isLast: Bool
     let isSelected: Bool
+    /// The neighbor above stands selected: its light falls onto this
+    /// row's own top edge.
+    var glowsFromTop: Bool = false
+    /// The neighbor below stands selected: its light falls onto this
+    /// row's own bottom edge.
+    var glowsFromBottom: Bool = false
     let tunnelUp: Bool
     var onSelect: () -> Void
     var onDelete: () -> Void
@@ -553,7 +579,18 @@ private struct ServerGroupRow: View {
     var body: some View {
         ZStack(alignment: .topTrailing) {
             rowContent
-                .background(rowFill)
+                .background(
+                    ZStack {
+                        rowFill
+                        glow
+                    }
+                )
+                .overlay(alignment: .bottom) {
+                    // The native lists never end a group with a divider:
+                    // the hairline lives only between the rows, never on
+                    // the card's own last edge.
+                    if !isLast { rowHairline }
+                }
                 .contextMenu { menu }
             if profile.pinned {
                 // The pin at the row's top-right corner, rotated the way the
@@ -589,6 +626,35 @@ private struct ServerGroupRow: View {
 
     private var rowSlice: CardSliceShape {
         CardSliceShape(top: isFirst, bottom: isLast)
+    }
+
+    /// The standing neighbor's own light, fallen onto this row: a soft
+    /// accent wash fading in from the seam the selected row sits
+    /// against — the leak the frost once bled across the gap, now an
+    /// intentional effect the flush rows carry. It rides behind the
+    /// content with the fill, never takes a touch, and fades with the
+    /// same ease the selection itself does.
+    private var glow: some View {
+        VStack(spacing: 0) {
+            LinearGradient(
+                colors: [Chumpy.accent.opacity(0.14), .clear],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+            .frame(height: 24)
+            .opacity(glowsFromTop ? 1 : 0)
+            .animation(.easeInOut(duration: 0.18), value: glowsFromTop)
+            Spacer(minLength: 0)
+            LinearGradient(
+                colors: [Chumpy.accent.opacity(0.14), .clear],
+                startPoint: .bottom,
+                endPoint: .top
+            )
+            .frame(height: 24)
+            .opacity(glowsFromBottom ? 1 : 0)
+            .animation(.easeInOut(duration: 0.18), value: glowsFromBottom)
+        }
+        .allowsHitTesting(false)
     }
 
     private var rowContent: some View {
@@ -765,11 +831,11 @@ private struct ServerGroupRow: View {
 // MARK: - Subscription chooser sheet
 
 /// The groups' own chooser: the subscription card's tap opens it — the
-/// same grouped list the servers page wears: slices of one card, the
-/// subscription card's very shape, cut apart by the gaps, the standing
-/// row on the accent's solid plate with its white check. A long-press
-/// asks the delete, the same context menu the server rows wear; the
-/// add row closes the group.
+/// same grouped list the servers page wears: one continuous card, the
+/// subscription card's very shape, its rows divided by the system's
+/// own hairlines, the standing row on the accent's solid plate with
+/// its white check. A long-press asks the delete, the same context
+/// menu the server rows wear; the add row closes the group.
 private struct SubscriptionChooserSheet: View {
     @ObservedObject var model: ServersViewModel
     var onAddSubscription: () -> Void
@@ -778,7 +844,9 @@ private struct SubscriptionChooserSheet: View {
     var body: some View {
         NavHost {
             ScrollView {
-                VStack(spacing: 2) {
+                // The rows butt flush, the servers list's own law: one
+                // continuous card, the seams carrying the hairlines.
+                VStack(spacing: 0) {
                     let hasStandalone = model.manualProfileCount > 0
                     if hasStandalone {
                         groupRow(
@@ -857,6 +925,11 @@ private struct SubscriptionChooserSheet: View {
         .padding(16)
         .frame(minHeight: 72)
         .background(rowFill(isFirst: isFirst, isLast: false, isSelected: isSelected))
+        .overlay(alignment: .bottom) {
+            // The add row always stands below this one, so the seam
+            // always carries the hairline.
+            rowHairline
+        }
         .contentShape(Rectangle())
         .onTapGesture {
             model.selectSubscription(id)
