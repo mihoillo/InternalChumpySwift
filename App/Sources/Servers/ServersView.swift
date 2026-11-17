@@ -4,9 +4,9 @@ import ChumpyCore
 
 /// Servers tab, ported from the Android client's `ServersScreen` layout:
 /// the subscription card with the database tile, the centered chips header
-/// (total / expired / concealed / sort), and the grouped rows wearing the
-/// outer 28dp corners at the group's own edges and the small 4dp ones
-/// inside. Pull-to-refresh runs the real-ping sweep.
+/// (total / expired / concealed / sort), and the grouped rows — slices of
+/// one card, the subscription card's very shape, cut apart by the gaps.
+/// Pull-to-refresh runs the real-ping sweep.
 struct ServersView: View {
     @EnvironmentObject private var appState: AppState
     @StateObject private var model = ServersViewModel()
@@ -502,6 +502,37 @@ private struct SubscriptionCard: View {
 
 // MARK: - Server group row
 
+/// The group card's own slice: the card's shape — the very shape the
+/// subscription card wears, the platform's own 28pt continuous corner —
+/// drawn in a rect grown past the row toward the group's inside, past
+/// the corner construction's whole reach, then cut back to the row's
+/// own bounds. The outer corners are the card's own genuine ones —
+/// never the mixed-radius corner the platform deforms to fit a short
+/// row, which the tile stopped nesting into — and the inner seam is a
+/// straight cut: one card, sliced apart by the gaps.
+private struct CardSliceShape: Shape {
+    /// The card's rounded top end lives inside this row's rect.
+    var top: Bool
+    /// The card's rounded bottom end lives inside this row's rect.
+    var bottom: Bool
+    /// How far past the row the card's shape extends toward the
+    /// group's inside — well past the corner construction's whole
+    /// reach, so the grown end never bends back into view.
+    private static let reach: CGFloat = 72
+
+    func path(in rect: CGRect) -> Path {
+        var grown = rect
+        if !top {
+            grown.origin.y -= Self.reach
+            grown.size.height += Self.reach
+        }
+        if !bottom {
+            grown.size.height += Self.reach
+        }
+        return Path(roundedRect: grown, cornerRadius: Chumpy.cardRadius, style: .continuous)
+    }
+}
+
 /// One row of the grouped list: the 72pt-min body, the round 40pt tile
 /// (tonal, accent when picked) with the flag or the globe, the title with
 /// its "· N ms" tail (accent from 200 ms), the protocol/host supporting
@@ -540,27 +571,24 @@ private struct ServerGroupRow: View {
     }
 
     /// The row's own paint, riding behind the content as its background —
-    /// the group's outer 28pt / inner 4pt corner law. The resting row
-    /// wears the native frost; the selected one the accent's own solid
-    /// plate — never a transparent wash. The layers crossfade, for a
-    /// style swap animates between styles that don't blend and
-    /// renders black.
+    /// its slice of the group's one card: the card's own shape (the
+    /// subscription card's very shape) grown toward the group's inside
+    /// and cut back to the row's bounds. The resting row wears the
+    /// native frost; the selected one the accent's own solid plate —
+    /// never a transparent wash. The layers crossfade, for a style swap
+    /// animates between styles that don't blend and renders black.
     private var rowFill: some View {
         ZStack {
-            rowShape.fill(.regularMaterial)
-            rowShape.fill(Chumpy.accent)
+            rowSlice.fill(.regularMaterial)
+            rowSlice.fill(Chumpy.accent)
                 .opacity(isSelected ? 1 : 0)
         }
+        .clipped()
         .animation(.easeInOut(duration: 0.18), value: isSelected)
     }
 
-    private var rowShape: UnevenCornerShape {
-        UnevenCornerShape(
-            topLeft: isFirst ? Chumpy.cardRadius : Chumpy.innerRadius,
-            topRight: isFirst ? Chumpy.cardRadius : Chumpy.innerRadius,
-            bottomLeft: isLast ? Chumpy.cardRadius : Chumpy.innerRadius,
-            bottomRight: isLast ? Chumpy.cardRadius : Chumpy.innerRadius
-        )
+    private var rowSlice: CardSliceShape {
+        CardSliceShape(top: isFirst, bottom: isLast)
     }
 
     private var rowContent: some View {
@@ -737,11 +765,11 @@ private struct ServerGroupRow: View {
 // MARK: - Subscription chooser sheet
 
 /// The groups' own chooser: the subscription card's tap opens it — the
-/// same grouped list the servers page wears: one continuous card, the
-/// outer 28pt corners at the group's own edges and the 4pt ones inside,
-/// the standing row on the accent's solid plate with its white check.
-/// A long-press asks the delete, the same context menu the server rows
-/// wear; the add row closes the group.
+/// same grouped list the servers page wears: slices of one card, the
+/// subscription card's very shape, cut apart by the gaps, the standing
+/// row on the accent's solid plate with its white check. A long-press
+/// asks the delete, the same context menu the server rows wear; the
+/// add row closes the group.
 private struct SubscriptionChooserSheet: View {
     @ObservedObject var model: ServersViewModel
     var onAddSubscription: () -> Void
@@ -862,7 +890,13 @@ private struct SubscriptionChooserSheet: View {
         }
         .padding(16)
         .frame(minHeight: 72)
-        .background(rowFill(isFirst: false, isLast: true, isSelected: false))
+        .background(
+            rowFill(
+                isFirst: model.manualProfileCount == 0 && model.subscriptions.isEmpty,
+                isLast: true,
+                isSelected: false
+            )
+        )
         .contentShape(Rectangle())
         .onTapGesture {
             dismiss()
@@ -872,24 +906,17 @@ private struct SubscriptionChooserSheet: View {
         }
     }
 
-    /// The row's own paint — the servers list's own law: the native
-    /// frost at rest, the accent's solid plate when standing, the
-    /// layers crossing over the group's corner law.
+    /// The row's own paint — its slice of the group's one card: the
+    /// card's own shape (the subscription card's very shape) grown
+    /// toward the group's inside and cut back to the row's bounds. The
+    /// native frost at rest, the accent's solid plate when standing.
     private func rowFill(isFirst: Bool, isLast: Bool, isSelected: Bool) -> some View {
         ZStack {
-            rowShape(isFirst: isFirst, isLast: isLast).fill(.regularMaterial)
-            rowShape(isFirst: isFirst, isLast: isLast).fill(Chumpy.accent)
+            CardSliceShape(top: isFirst, bottom: isLast).fill(.regularMaterial)
+            CardSliceShape(top: isFirst, bottom: isLast).fill(Chumpy.accent)
                 .opacity(isSelected ? 1 : 0)
         }
+        .clipped()
         .animation(.easeInOut(duration: 0.18), value: isSelected)
-    }
-
-    private func rowShape(isFirst: Bool, isLast: Bool) -> UnevenCornerShape {
-        UnevenCornerShape(
-            topLeft: isFirst ? Chumpy.cardRadius : Chumpy.innerRadius,
-            topRight: isFirst ? Chumpy.cardRadius : Chumpy.innerRadius,
-            bottomLeft: isLast ? Chumpy.cardRadius : Chumpy.innerRadius,
-            bottomRight: isLast ? Chumpy.cardRadius : Chumpy.innerRadius
-        )
     }
 }
