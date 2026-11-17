@@ -1,15 +1,19 @@
 import SwiftUI
 
-/// The app shell: full-screen content with Chumpy's floating bar — the
-/// iOS 26 way, the way the original client's own tab row wore it: one
-/// glass capsule, the four tabs as icons alone, settings among them,
-/// the selection a glass capsule gliding between the equal slots — under
-/// the finger with the swipe, on the shared spring with the settle. The
-/// pages ride one horizontal deck — a swipe deals it under the finger,
-/// the bar's buttons scroll it along the same spine, page over page.
+/// The app shell: full-screen content with Chumpy's two-pill floating bar —
+/// the tabs' capsule with the round gear door beside it, compact, the way
+/// the original client wears it. The tabs are icons alone, the selection a
+/// glass capsule gliding between the equal slots — under the finger with
+/// the swipe, on the shared spring with the settle — and past the last
+/// tab the selection flows over to the gear, whose own circle swells
+/// into a capsule as the deck rides on to settings. The pages ride one
+/// horizontal deck — a swipe deals it under the finger, the bar's
+/// buttons scroll it along the same spine, page over page.
 struct MainShellView: View {
     @EnvironmentObject private var appState: AppState
     @State private var page: Page = .home
+    /// The tab the gear folds back to — the last one that stood.
+    @State private var lastTab: Tab = .home
 
     /// The live page's scroll, by tag: every page keeps its own word
     /// in the reporter, so the frost knows the page's stance the moment
@@ -18,7 +22,7 @@ struct MainShellView: View {
     @ObservedObject private var scrollReporter = ScrollReporter.shared
 
     enum Tab: Int, CaseIterable, Identifiable {
-        case home, servers, stats, settings
+        case home, servers, stats
 
         var id: Int { rawValue }
 
@@ -27,7 +31,6 @@ struct MainShellView: View {
             case .home: return "house"
             case .servers: return "square.stack.3d.up"
             case .stats: return "chart.bar"
-            case .settings: return "gearshape"
             }
         }
 
@@ -36,7 +39,6 @@ struct MainShellView: View {
             case .home: return "house.fill"
             case .servers: return "square.stack.3d.up.fill"
             case .stats: return "chart.bar.fill"
-            case .settings: return "gearshape.fill"
             }
         }
     }
@@ -152,7 +154,7 @@ struct MainShellView: View {
                     .transition(.opacity)
             }
 
-            tabsPill
+            bar
                 .padding(.horizontal, 16)
                 .padding(.bottom, 12)
                 .zIndex(1)
@@ -313,35 +315,46 @@ struct MainShellView: View {
 
     /// The one road every settle rides — the swipe's end, the watchdog's
     /// recovery, the bar's own ride: the deck lands on the page on the
-    /// shared spring, and the bar's tabs learn the page.
+    /// shared spring, and the gear remembers the last tab that stood.
     private func settleDeck(to target: Page) {
         withAnimation(deckMotion) {
             deckPosition = CGFloat(target.rawValue)
             page = target
         }
+        if let tab = Tab(rawValue: target.rawValue) {
+            lastTab = tab
+        }
     }
 
     // MARK: - The bar
 
-    /// The bar the iOS 26 way: one glass capsule, the four tabs as
-    /// icons alone — the words were the indicator's tether, and the
-    /// system's own bar dropped them for the same reason — with the
-    /// selection as a glass capsule gliding between the equal slots.
-    /// The indicator rides the deck's own position: it travels under
-    /// the finger with the swipe and settles on the same spring the
-    /// pages do, and the icon's tint flips as the glass crosses the
-    /// halfway line, the way the system's own bar reads mid-swipe.
+    /// The bar the Chumpy way, compact: the tabs' capsule and the round
+    /// gear door beside it. The tabs are icons alone, the selection a
+    /// glass capsule gliding between the equal slots — it rides the
+    /// deck's own position, under the finger with the swipe, on the
+    /// shared spring with the settle, the icon's tint flipping as the
+    /// glass crosses the halfway line. Past the last tab the glass
+    /// dissolves — the selection flows over to the gear, whose own
+    /// circle swells into a capsule as the deck rides on to settings.
+    private var bar: some View {
+        HStack(spacing: 12) {
+            tabsPill
+            gearButton
+        }
+    }
+
+    /// One tab slot's own width — equal slots, the glass's travel step.
+    private static let slotWidth: CGFloat = 56
+
     private var tabsPill: some View {
-        GeometryReader { geo in
-            let slot = geo.size.width / CGFloat(Tab.allCases.count)
-            ZStack(alignment: .leading) {
-                tabIndicator
-                    .frame(width: slot, height: 48)
-                    .offset(x: deckPosition * slot)
-                HStack(spacing: 0) {
-                    ForEach(Tab.allCases) { tab in
-                        tabItem(tab)
-                    }
+        ZStack(alignment: .leading) {
+            tabIndicator
+                .frame(width: Self.slotWidth, height: 48)
+                .offset(x: indicatorTravel * Self.slotWidth)
+                .opacity(indicatorPresence)
+            HStack(spacing: 0) {
+                ForEach(Tab.allCases) { tab in
+                    tabItem(tab)
                 }
             }
         }
@@ -350,6 +363,18 @@ struct MainShellView: View {
         .chumpyGlassCapsule()
         .clipShape(Capsule())
         .chumpyPillEdge()
+    }
+
+    /// The glass's travel in slots: it rides the deck between the tabs
+    /// and parks at the last one while the deck rides on to settings.
+    private var indicatorTravel: CGFloat {
+        min(max(deckPosition, 0), CGFloat(Tab.allCases.count - 1))
+    }
+
+    /// The glass's presence: it dissolves through the last tab's
+    /// leaving travel, its light flowing over to the gear instead.
+    private var indicatorPresence: CGFloat {
+        1 - min(max(deckPosition - CGFloat(Tab.allCases.count - 1), 0), 1)
     }
 
     /// The selection's own glass: Liquid Glass on iOS 26 — the inner
@@ -378,10 +403,38 @@ struct MainShellView: View {
             openTab(tab)
         } label: {
             tabIcon(tab, isSelected: isSelected)
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .frame(width: Self.slotWidth, maxHeight: .infinity)
         }
         .buttonStyle(BarPressStyle())
         .foregroundStyle(isSelected ? Color.accentColor : Color.secondary)
+    }
+
+    /// The round gear door — the settings' own seat, apart from the
+    /// tabs the way the original client keeps it. A circle at rest; as
+    /// the deck rides over from the last tab the circle swells into a
+    /// capsule — the glass morphs with the frame, a capsule square with
+    /// the circle being the circle itself — and the icon lights as the
+    /// deck crosses the halfway line. A tap rides to settings, or folds
+    /// back to the last tab that stood.
+    private var gearButton: some View {
+        let settingsNear = min(
+            max(deckPosition - CGFloat(Tab.allCases.count - 1), 0), 1
+        )
+        let onSettings = deckPosition.rounded() == CGFloat(Page.settings.rawValue)
+
+        return Button {
+            let target: Page = page == .settings ? Page(tab: lastTab) : .settings
+            rideDeck(to: target)
+        } label: {
+            Image(systemName: "gearshape.fill")
+                .font(.system(size: 20, weight: .medium))
+        }
+        .buttonStyle(BarPressStyle())
+        .foregroundStyle(onSettings ? Color.accentColor : Color.secondary)
+        .frame(width: 64 + 28 * settingsNear, height: 64)
+        .chumpyGlassCapsule()
+        .clipShape(Capsule())
+        .chumpyPillEdge()
     }
 
     /// The tab's icon — with the bounce the platform gives symbols on
@@ -471,7 +524,6 @@ extension MainShellView.Page {
         case .home: self = .home
         case .servers: self = .servers
         case .stats: self = .stats
-        case .settings: self = .settings
         }
     }
 }
