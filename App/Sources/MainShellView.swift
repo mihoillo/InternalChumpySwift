@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 /// The app shell: full-screen content with Chumpy's two-pill floating bar —
 /// the tabs' pill on the left, the round gear button on the right. Ported
@@ -224,7 +225,9 @@ struct MainShellView: View {
     /// the finger leads, the ends resist, and letting go settles on
     /// the nearest step the throw points at, at most one page from
     /// where the drag began. A swipe left deals the next page, a swipe
-    /// right the one before it.
+    /// right the one before it. A gesture stolen or cancelled mid-
+    /// flight never speaks its onEnded — the watchdog settles the
+    /// deck on its nearest page instead.
     private func deckDrag(in size: CGSize) -> some Gesture {
         DragGesture(minimumDistance: 24)
             .onChanged { value in
@@ -232,7 +235,9 @@ struct MainShellView: View {
                     guard abs(value.translation.width) > abs(value.translation.height) else { return }
                     dragging = true
                     dragAnchor = deckPosition.rounded()
+                    startWatchdog()
                 }
+                lastDragEvent = .now
                 // Left is forward along the spine — the finger drags
                 // the deck, not the position, so the travel is the
                 // translation's mirror.
@@ -248,6 +253,7 @@ struct MainShellView: View {
             .onEnded { value in
                 guard dragging else { return }
                 dragging = false
+                watchdogTask?.cancel()
                 let traveled = -value.translation.width / size.width
                 let thrown = -value.velocity.width / size.width * 0.25
                 let raw = dragAnchor + traveled + thrown
@@ -257,30 +263,88 @@ struct MainShellView: View {
                 // the drag began — one forward or one back, never a leap.
                 let stepped = min(max(raw.rounded(), dragAnchor - 1), dragAnchor + 1)
                 let target = min(max(stepped, 0), available)
-                let targetPage = Page(rawValue: Int(target)) ?? page
-                withAnimation(deckMotion) {
-                    deckPosition = target
-                    page = targetPage
-                }
-                if let tab = Tab(rawValue: Int(target)) {
-                    lastTab = tab
-                }
+                settleDeck(to: Page(rawValue: Int(target)) ?? page)
             }
     }
 
     /// Sends the deck to a page on the bar's own ride: along the same
     /// horizontal spine, page over page, on the shared spring.
     private func rideDeck(to target: Page) {
-        withAnimation(deckMotion) {
-            page = target
-            deckPosition = CGFloat(target.rawValue)
-        }
+        settleDeck(to: target)
     }
 
     private func openTab(_ tab: Tab) {
         guard Page(tab: tab) != page else { return }
         lastTab = tab
         rideDeck(to: Page(tab: tab))
+    }
+
+    // MARK: - The deck's settler
+
+    /// The watchdog that walks the deck home when a gesture dies without
+    /// a word. A swipe that starts horizontal can be stolen mid-flight —
+    /// the page's own scroll view claims the touch on a diagonal drag,
+    /// the system swallows it on a control-center swipe — and a stolen
+    /// or cancelled gesture never speaks its onEnded: the deck would
+    /// rest between pages with `dragging` stuck true, and the next swipe
+    /// would ride a stale anchor. The watchdog listens for the silence:
+    /// once the drag has gone quiet and no finger is down anywhere, the
+    /// gesture is dead — the deck settles on its nearest page on the
+    /// shared spring, and the drag state resets.
+    @State private var watchdogTask: Task<Void, Never>?
+
+    /// When the drag last spoke — every onChanged feeds it.
+    @State private var lastDragEvent = Date.distantPast
+
+    /// Starts the watchdog on the drag's first word.
+    private func startWatchdog() {
+        watchdogTask?.cancel()
+        watchdogTask = Task { @MainActor in
+            while !Task.isCancelled {
+                try? await Task.sleep(nanoseconds: 100_000_000)
+                guard dragging, !Task.isCancelled else { return }
+                guard Date.now.timeIntervalSince(lastDragEvent) > 0.35 else { continue }
+                // A finger still down anywhere is a live touch, however
+                // silent — a held finger mid-drag must not be settled
+                // under. Only a truly dead gesture leaves the deck
+                // alone to be walked home.
+                guard !anyFingerDown else { continue }
+                dragging = false
+                settleDeck(to: nearestPage())
+                return
+            }
+        }
+    }
+
+    /// Is a finger still down on any window — a held touch the drag
+    /// may still belong to.
+    private var anyFingerDown: Bool {
+        UIApplication.shared.connectedScenes
+            .compactMap { ($0 as? UIWindowScene)?.keyWindow }
+            .contains { window in
+                guard let touches = window.allTouches else { return false }
+                return !touches.isEmpty
+            }
+    }
+
+    /// The page the deck sits closest to — the watchdog's landing spot.
+    private func nearestPage() -> Page {
+        let available = CGFloat(Page.settings.rawValue)
+        let target = min(max(deckPosition.rounded(), 0), available)
+        return Page(rawValue: Int(target)) ?? page
+    }
+
+    /// The one road every settle rides — the swipe's end, the watchdog's
+    /// recovery, the bar's own ride: the deck lands on the page on the
+    /// shared spring, and the bar's tabs learn the page.
+    private func settleDeck(to target: Page) {
+        withAnimation(deckMotion) {
+            deckPosition = CGFloat(target.rawValue)
+            page = target
+        }
+        if let tab = Tab(rawValue: target.rawValue) {
+            lastTab = tab
+        }
     }
 
     // MARK: - The two-pill bar
