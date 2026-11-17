@@ -403,7 +403,7 @@ struct MainShellView: View {
             openTab(tab)
         } label: {
             tabIcon(tab, isSelected: isSelected)
-                .frame(width: Self.slotWidth, maxHeight: .infinity)
+                .frame(width: Self.slotWidth, height: 64)
         }
         .buttonStyle(BarPressStyle())
         .foregroundStyle(isSelected ? Color.accentColor : Color.secondary)
