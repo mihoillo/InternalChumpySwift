@@ -222,8 +222,9 @@ struct MainShellView: View {
 
     /// The horizontal swipe: a clearly horizontal drag is the deck's —
     /// the finger leads, the ends resist, and letting go settles on
-    /// the nearest page or the one the throw points at. A swipe left
-    /// deals the next page, a swipe right the one before it.
+    /// the nearest step the throw points at, at most one page from
+    /// where the drag began. A swipe left deals the next page, a swipe
+    /// right the one before it.
     private func deckDrag(in size: CGSize) -> some Gesture {
         DragGesture(minimumDistance: 24)
             .onChanged { value in
@@ -251,7 +252,11 @@ struct MainShellView: View {
                 let thrown = -value.velocity.width / size.width * 0.25
                 let raw = dragAnchor + traveled + thrown
                 let available = CGFloat(Page.settings.rawValue)
-                let target = min(max(raw.rounded(), 0), available)
+                // One page per swipe: the throw may point past the next
+                // page, but the deck settles at most one step from where
+                // the drag began — one forward or one back, never a leap.
+                let stepped = min(max(raw.rounded(), dragAnchor - 1), dragAnchor + 1)
+                let target = min(max(stepped, 0), available)
                 let targetPage = Page(rawValue: Int(target)) ?? page
                 withAnimation(deckMotion) {
                     deckPosition = target
