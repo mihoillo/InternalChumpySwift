@@ -1,14 +1,17 @@
 import SwiftUI
 
-/// The app shell: full-screen content with Chumpy's two-pill floating bar —
-/// the tabs' capsule with the round gear door beside it, compact, the way
-/// the original client wears it. The tabs are icons alone, the selection a
-/// glass capsule gliding between the equal slots — under the finger with
-/// the swipe, on the shared spring with the settle — and past the last
-/// tab the selection flows over to the gear, whose own circle swells
-/// into a capsule as the deck rides on to settings. The pages ride one
-/// horizontal deck — a swipe deals it under the finger, the bar's
-/// buttons scroll it along the same spine, page over page.
+/// The app shell: full-screen content with Chumpy's two-pill floating
+/// bar — the tabs' capsule and the gear's circle, compact, the way the
+/// original client wears it. The deck runs the original's whole length:
+/// the three tabs, then the settings' own three leaves — interface,
+/// connection, about — and as the deck rides into the settings region
+/// the pills trade faces: the tabs fold into the round back arrow, the
+/// gear unfolds into the categories' capsule, the bar's own width
+/// never changing. The item faces wear the glass indicator gliding
+/// between the equal slots — under the finger with the swipe, on the
+/// shared spring with the settle — and a press held half a beat swells
+/// the glass and lets the finger drag it, the iOS 26 bar's own trick
+/// rebuilt for the plain material years.
 struct MainShellView: View {
     @EnvironmentObject private var appState: AppState
     @State private var page: Page = .home
@@ -43,8 +46,12 @@ struct MainShellView: View {
         }
     }
 
+    /// The deck's pages: the three tabs, then the settings deck's own
+    /// three leaves — interface, connection, about — the way the
+    /// original client's own deck runs on.
     enum Page: Int {
-        case home = 0, servers = 1, stats = 2, settings = 3
+        case home = 0, servers = 1, stats = 2
+        case interface = 3, connection = 4, about = 5
     }
 
     /// The deck's own ride: every page change slides along it — a
@@ -72,7 +79,9 @@ struct MainShellView: View {
         case .home: return "home"
         case .servers: return "servers"
         case .stats: return "stats"
-        case .settings: return "settings"
+        case .interface: return "interface"
+        case .connection: return "connection"
+        case .about: return "about"
         }
     }
 
@@ -111,7 +120,9 @@ struct MainShellView: View {
         case .home: return "tab.home"
         case .servers: return "tab.servers"
         case .stats: return "tab.stats"
-        case .settings: return "tab.settings"
+        case .interface: return "settings.interface"
+        case .connection: return "settings.connection"
+        case .about: return "settings.about"
         }
     }
 
@@ -177,8 +188,12 @@ struct MainShellView: View {
                     .offset(pageOffset(for: .servers, in: geo.size))
                 StatsView()
                     .offset(pageOffset(for: .stats, in: geo.size))
+                InterfaceView()
+                    .offset(pageOffset(for: .interface, in: geo.size))
                 SettingsView()
-                    .offset(pageOffset(for: .settings, in: geo.size))
+                    .offset(pageOffset(for: .connection, in: geo.size))
+                AboutView()
+                    .offset(pageOffset(for: .about, in: geo.size))
             }
             .frame(width: geo.size.width, height: geo.size.height)
             .contentShape(Rectangle())
@@ -236,7 +251,7 @@ struct MainShellView: View {
                 // the deck, not the position, so the travel is the
                 // translation's mirror, past the anchor's own.
                 let traveled = -value.translation.width / size.width - dragAnchorTravel
-                let available = CGFloat(Page.settings.rawValue)
+                let available = CGFloat(Page.about.rawValue)
                 let raw = dragAnchor + traveled
                 // The ends resist: past the first or the last page the
                 // deck yields less and less, and always springs back.
@@ -251,7 +266,7 @@ struct MainShellView: View {
                 let traveled = -value.translation.width / size.width - dragAnchorTravel
                 let thrown = -value.velocity.width / size.width * 0.25
                 let raw = dragAnchor + traveled + thrown
-                let available = CGFloat(Page.settings.rawValue)
+                let available = CGFloat(Page.about.rawValue)
                 // One page per swipe: the throw may point past the next
                 // page, but the deck settles at most one step from where
                 // the drag began — one forward or one back, never a leap.
@@ -308,7 +323,7 @@ struct MainShellView: View {
 
     /// The page the deck sits closest to — the watchdog's landing spot.
     private func nearestPage() -> Page {
-        let available = CGFloat(Page.settings.rawValue)
+        let available = CGFloat(Page.about.rawValue)
         let target = min(max(deckPosition.rounded(), 0), available)
         return Page(rawValue: Int(target)) ?? page
     }
@@ -328,53 +343,184 @@ struct MainShellView: View {
 
     // MARK: - The bar
 
-    /// The bar the Chumpy way, compact: the tabs' capsule and the round
-    /// gear door beside it. The tabs are icons alone, the selection a
-    /// glass capsule gliding between the equal slots — it rides the
-    /// deck's own position, under the finger with the swipe, on the
-    /// shared spring with the settle, the icon's tint flipping as the
-    /// glass crosses the halfway line. Past the last tab the glass
-    /// dissolves — the selection flows over to the gear, whose own
-    /// circle swells into a capsule as the deck rides on to settings.
+    /// The bar the Chumpy way, compact: two pills trading faces as the
+    /// deck rides into the settings region and back — the tabs'
+    /// capsule folding into the round back arrow, the gear's circle
+    /// unfolding into the categories' capsule — the whole trade keeping
+    /// the bar's own width, the pills merely swapping their weight.
     private var bar: some View {
         HStack(spacing: 12) {
             tabsPill
-            gearButton
+            settingsPill
+        }
+        // The held press swells the whole bar a touch — the glass
+        // leaning toward the finger.
+        .scaleEffect(scrubbing ? 1.04 : 1, anchor: .bottom)
+        .animation(.spring(response: 0.32, dampingFraction: 0.8), value: scrubbing)
+    }
+
+    /// How far the deck has ridden into the settings region: 0 at the
+    /// last tab, 1 at the interface page. Both pills' faces ride it.
+    private var settingsNear: CGFloat {
+        min(max(deckPosition - CGFloat(Tab.allCases.count - 1), 0), 1)
+    }
+
+    /// One item slot's own width — equal slots, the glass's travel step.
+    private static let slotWidth: CGFloat = 56
+    /// The item face's own content width: three slots.
+    private static let faceWidth: CGFloat = slotWidth * 3
+    /// The pill's own full girth: the face plus its side insets.
+    private static let pillWidth: CGFloat = faceWidth + 24
+
+    /// One item of the bar's item faces: the icon pair and the page it
+    /// opens.
+    private struct BarItem {
+        let icon: String
+        let activeIcon: String
+        let page: Page
+    }
+
+    /// The tabs' own face items — the three pages the tabs own.
+    private var tabItems: [BarItem] {
+        Tab.allCases.map {
+            BarItem(icon: $0.icon, activeIcon: $0.activeIcon, page: Page(tab: $0))
         }
     }
 
-    /// One tab slot's own width — equal slots, the glass's travel step.
-    private static let slotWidth: CGFloat = 56
+    /// The settings deck's own leaves, the original client's categories:
+    /// interface, connection, about.
+    private var categoryItems: [BarItem] {
+        [
+            BarItem(icon: "paintpalette", activeIcon: "paintpalette.fill", page: .interface),
+            BarItem(icon: "arrow.triangle.branch", activeIcon: "arrow.triangle.branch", page: .connection),
+            BarItem(icon: "info.circle", activeIcon: "info.circle.fill", page: .about),
+        ]
+    }
 
+    /// The tabs' pill: the item face at rest, folding into the round
+    /// back arrow as the deck rides into settings — the face pinned to
+    /// the leading edge, the pill shrinking under it, the arrow fading
+    /// in centered in what remains.
     private var tabsPill: some View {
         ZStack(alignment: .leading) {
-            tabIndicator
-                .frame(width: Self.slotWidth, height: 48)
-                .offset(x: indicatorTravel * Self.slotWidth)
-                .opacity(indicatorPresence)
-            HStack(spacing: 0) {
-                ForEach(Tab.allCases) { tab in
-                    tabItem(tab)
-                }
-            }
+            itemsFace(tabItems, basePage: Page.home.rawValue)
+                .opacity(1 - settingsNear)
+                .allowsHitTesting(settingsNear < 0.5)
+            backFace
+                .opacity(settingsNear)
+                .allowsHitTesting(settingsNear >= 0.5)
         }
-        .frame(height: 64)
-        .padding(.horizontal, 12)
+        .frame(width: 64 + (Self.pillWidth - 64) * (1 - settingsNear), height: 64)
         .chumpyGlassCapsule()
         .clipShape(Capsule())
         .chumpyPillEdge()
     }
 
-    /// The glass's travel in slots: it rides the deck between the tabs
-    /// and parks at the last one while the deck rides on to settings.
-    private var indicatorTravel: CGFloat {
-        min(max(deckPosition, 0), CGFloat(Tab.allCases.count - 1))
+    /// The settings' pill: the gear's circle at rest, unfolding into the
+    /// categories' capsule as the deck rides in — the gear spinning
+    /// away as it goes, the way the original client's own gear unfolds.
+    private var settingsPill: some View {
+        ZStack(alignment: .leading) {
+            gearFace
+                .opacity(1 - settingsNear)
+                .allowsHitTesting(settingsNear < 0.5)
+            itemsFace(categoryItems, basePage: Page.interface.rawValue)
+                .opacity(settingsNear)
+                .allowsHitTesting(settingsNear >= 0.5)
+        }
+        .frame(width: 64 + (Self.pillWidth - 64) * settingsNear, height: 64)
+        .chumpyGlassCapsule()
+        .clipShape(Capsule())
+        .chumpyPillEdge()
     }
 
-    /// The glass's presence: it dissolves through the last tab's
-    /// leaving travel, its light flowing over to the gear instead.
-    private var indicatorPresence: CGFloat {
-        1 - min(max(deckPosition - CGFloat(Tab.allCases.count - 1), 0), 1)
+    /// The back face — the round arrow the tabs fold into: a tap folds
+    /// the deck back to the last tab that stood.
+    private var backFace: some View {
+        Image(systemName: "chevron.backward")
+            .font(.system(size: 17, weight: .semibold))
+            .foregroundStyle(Color.accentColor)
+            .frame(width: 64, height: 64)
+            .contentShape(Rectangle())
+            .onTapGesture {
+                rideDeck(to: Page(tab: lastTab))
+            }
+    }
+
+    /// The gear face — the settings door at rest, the deck's ride into
+    /// the settings region starting here.
+    private var gearFace: some View {
+        Image(systemName: "gearshape.fill")
+            .font(.system(size: 20, weight: .medium))
+            .foregroundStyle(
+                deckPosition.rounded() >= CGFloat(Page.interface.rawValue)
+                    ? Color.accentColor
+                    : Color.secondary
+            )
+            .rotationEffect(.degrees(120 * settingsNear))
+            .frame(width: 64, height: 64)
+            .contentShape(Rectangle())
+            .onTapGesture {
+                rideDeck(to: .interface)
+            }
+    }
+
+    /// An item face: the glass indicator gliding between the equal
+    /// slots behind the icons. The indicator rides the deck's own
+    /// position — under the finger with the swipe, on the shared spring
+    /// with the settle — and the tint flips as the glass crosses the
+    /// halfway line.
+    private func itemsFace(_ items: [BarItem], basePage: Int) -> some View {
+        ZStack(alignment: .leading) {
+            tabIndicator
+                .frame(width: Self.slotWidth, height: scrubbing ? 56 : 48)
+                .offset(x: indicatorOffset(basePage: basePage, count: items.count))
+                .animation(.spring(response: 0.32, dampingFraction: 0.8), value: scrubbing)
+            HStack(spacing: 0) {
+                ForEach(Array(items.enumerated()), id: \.offset) { _, item in
+                    itemSlot(item, basePage: basePage)
+                }
+            }
+            .contentShape(Rectangle())
+            .gesture(scrubGesture(basePage: basePage))
+        }
+        .frame(width: Self.faceWidth, height: 64)
+        .padding(.horizontal, 12)
+    }
+
+    /// The glass's leading offset: it rides the deck between the slots,
+    /// or the finger itself while the press holds — centered under the
+    /// touch, clamped to the face's own ends.
+    private func indicatorOffset(basePage: Int, count: Int) -> CGFloat {
+        if scrubbing, let scrubX {
+            return min(
+                max(scrubX - Self.slotWidth / 2, 0),
+                Self.faceWidth - Self.slotWidth
+            )
+        }
+        let travel = min(
+            max(deckPosition - CGFloat(basePage), 0),
+            CGFloat(count - 1)
+        )
+        return travel * Self.slotWidth
+    }
+
+    private func itemSlot(_ item: BarItem, basePage: Int) -> some View {
+        // The tint rides the live position — the deck's own, or the
+        // finger's while the press holds: the icon lights as the glass
+        // crosses the halfway line, and dims the same way back.
+        let live: CGFloat
+        if scrubbing, let scrubX {
+            live = CGFloat(basePage)
+                + min(max((scrubX - Self.slotWidth / 2) / Self.slotWidth, 0), 2)
+        } else {
+            live = deckPosition
+        }
+        let isSelected = live.rounded() == CGFloat(item.page.rawValue)
+
+        return itemIcon(item, isSelected: isSelected)
+            .frame(width: Self.slotWidth, height: 64)
+            .foregroundStyle(isSelected ? Color.accentColor : Color.secondary)
     }
 
     /// The selection's own glass: Liquid Glass on iOS 26 — the inner
@@ -393,55 +539,11 @@ struct MainShellView: View {
         #endif
     }
 
-    private func tabItem(_ tab: Tab) -> some View {
-        // The tint rides the deck's own position, not the settled
-        // page: the icon lights as the glass crosses the halfway
-        // line, and dims the same way on the ride back.
-        let isSelected = deckPosition.rounded() == CGFloat(tab.rawValue)
-
-        return Button {
-            openTab(tab)
-        } label: {
-            tabIcon(tab, isSelected: isSelected)
-                .frame(width: Self.slotWidth, height: 64)
-        }
-        .buttonStyle(BarPressStyle())
-        .foregroundStyle(isSelected ? Color.accentColor : Color.secondary)
-    }
-
-    /// The round gear door — the settings' own seat, apart from the
-    /// tabs the way the original client keeps it. A circle at rest; as
-    /// the deck rides over from the last tab the circle swells into a
-    /// capsule — the glass morphs with the frame, a capsule square with
-    /// the circle being the circle itself — and the icon lights as the
-    /// deck crosses the halfway line. A tap rides to settings, or folds
-    /// back to the last tab that stood.
-    private var gearButton: some View {
-        let settingsNear = min(
-            max(deckPosition - CGFloat(Tab.allCases.count - 1), 0), 1
-        )
-        let onSettings = deckPosition.rounded() == CGFloat(Page.settings.rawValue)
-
-        return Button {
-            let target: Page = page == .settings ? Page(tab: lastTab) : .settings
-            rideDeck(to: target)
-        } label: {
-            Image(systemName: "gearshape.fill")
-                .font(.system(size: 20, weight: .medium))
-        }
-        .buttonStyle(BarPressStyle())
-        .foregroundStyle(onSettings ? Color.accentColor : Color.secondary)
-        .frame(width: 64 + 28 * settingsNear, height: 64)
-        .chumpyGlassCapsule()
-        .clipShape(Capsule())
-        .chumpyPillEdge()
-    }
-
-    /// The tab's icon — with the bounce the platform gives symbols on
+    /// The item's icon — with the bounce the platform gives symbols on
     /// iOS 17+, plain everywhere below.
     @ViewBuilder
-    private func tabIcon(_ tab: Tab, isSelected: Bool) -> some View {
-        let icon = Image(systemName: isSelected ? tab.activeIcon : tab.icon)
+    private func itemIcon(_ item: BarItem, isSelected: Bool) -> some View {
+        let icon = Image(systemName: isSelected ? item.activeIcon : item.icon)
             .font(.system(size: 18, weight: .medium))
         if #available(iOS 17.0, *) {
             icon.symbolEffect(.bounce, value: isSelected)
@@ -449,15 +551,56 @@ struct MainShellView: View {
             icon
         }
     }
-}
 
-/// The bar's press feedback: the whole pill gives a living squish instead
-/// of the platform's flat flash.
-private struct BarPressStyle: ButtonStyle {
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .scaleEffect(configuration.isPressed ? 0.90 : 1)
-            .animation(.spring(response: 0.25, dampingFraction: 0.55), value: configuration.isPressed)
+    // MARK: - The held press
+
+    /// True while a press held on an item face has swelled the glass —
+    /// the iOS 26 bar's own trick, rebuilt for the plain material
+    /// years: the glass grows and rides the finger until it lets go.
+    @State private var scrubbing = false
+    /// The finger's own x, in the face's coordinate space, while the
+    /// press holds.
+    @State private var scrubX: CGFloat?
+    /// The press's own clock — armed on the touch, cancelled on the
+    /// release; half a beat of stillness swells the glass.
+    @State private var holdTask: Task<Void, Never>?
+
+    /// The face's own touch law: a quick release is a tap — the slot it
+    /// lands on opens; a press held half a beat swells the glass and
+    /// hands it to the finger — it drags between the slots, the tint
+    /// flipping as it crosses each halfway — and the release settles
+    /// the deck on the slot under the finger.
+    private func scrubGesture(basePage: Int) -> some Gesture {
+        DragGesture(minimumDistance: 0)
+            .onChanged { value in
+                if scrubbing {
+                    scrubX = value.location.x
+                } else if holdTask == nil {
+                    let startX = value.location.x
+                    holdTask = Task { @MainActor in
+                        try? await Task.sleep(nanoseconds: 320_000_000)
+                        guard !Task.isCancelled else { return }
+                        withAnimation(.spring(response: 0.32, dampingFraction: 0.8)) {
+                            scrubbing = true
+                            scrubX = startX
+                        }
+                    }
+                }
+            }
+            .onEnded { value in
+                holdTask?.cancel()
+                holdTask = nil
+                let slot = min(
+                    max(
+                        Int((value.location.x - Self.slotWidth / 2) / Self.slotWidth),
+                        0
+                    ),
+                    2
+                )
+                scrubbing = false
+                scrubX = nil
+                rideDeck(to: Page(rawValue: basePage + slot) ?? page)
+            }
     }
 }
 

@@ -59,6 +59,11 @@
 "settings.status" = "Status";
 "settings.reinstallProfile" = "Remove VPN profile";
 "settings.about" = "About";
+"settings.interface" = "Interface";
+"settings.theme" = "Theme";
+"settings.theme.system" = "System";
+"settings.theme.light" = "Light";
+"settings.theme.dark" = "Dark";
 "settings.appVersion" = "App version";
 "settings.coreVersion" = "Xray core";
 

@@ -59,6 +59,11 @@
 "settings.status" = "Статус";
 "settings.reinstallProfile" = "Удалить VPN-профиль";
 "settings.about" = "О приложении";
+"settings.interface" = "Интерфейс";
+"settings.theme" = "Тема";
+"settings.theme.system" = "Системная";
+"settings.theme.light" = "Светлая";
+"settings.theme.dark" = "Тёмная";
 "settings.appVersion" = "Версия приложения";
 "settings.coreVersion" = "Ядро Xray";
 

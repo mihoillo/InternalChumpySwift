@@ -1,10 +1,13 @@
 import SwiftUI
 import ChumpyCore
 
-/// Settings tab, in the Chumpy card language: the connection card, the
-/// tunnel card, the about card — 28dp tonal cards with icon'd headers,
-/// the connection section writing straight to the shared defaults the
-/// tunnel reads on the next connect.
+/// The Connection settings page — the settings deck's middle leaf, the
+/// one the old single settings screen was: the connection card, the
+/// subscriptions card, the tunnel card, 28dp tonal cards in the Chumpy
+/// card language, the connection section writing straight to the shared
+/// defaults the tunnel reads on the next connect. The page's own title
+/// in the header already says "Connection", so the connection card
+/// doesn't repeat it — the card speaks its rows alone.
 struct SettingsView: View {
     @EnvironmentObject private var appState: AppState
     @AppStorage(
@@ -24,14 +27,13 @@ struct SettingsView: View {
     private let store = ProfileStore()
 
     var body: some View {
-        EdgeScrollView(tag: "settings") {
+        EdgeScrollView(tag: "connection") {
             VStack(spacing: 12) {
                 connectionCard
                 if !subscriptions.isEmpty {
                     subscriptionsCard
                 }
                 tunnelCard
-                aboutCard
             }
             .padding(.horizontal, 16)
             .padding(.top, chumpyContentTopPadding)
@@ -80,10 +82,11 @@ struct SettingsView: View {
 
     // MARK: - Connection
 
+    /// The connection card — no header of its own: the page's title in
+    /// the header strip already speaks the word, and the card's rows
+    /// carry the rest.
     private var connectionCard: some View {
         VStack(alignment: .leading, spacing: 12) {
-            ChartHeader(icon: "arrow.triangle.branch", title: "settings.connection")
-
             Menu {
                 ForEach(RoutingMode.allCases) { mode in
                     Button {
@@ -165,30 +168,6 @@ struct SettingsView: View {
         .chumpyCard()
     }
 
-    // MARK: - About
-
-    private var aboutCard: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            ChartHeader(icon: "info.circle", title: "settings.about")
-            HStack {
-                Text("settings.appVersion")
-                Spacer()
-                Text(appVersion)
-                    .foregroundStyle(.secondary)
-            }
-            .font(.system(size: 15))
-            HStack {
-                Text("settings.coreVersion")
-                Spacer()
-                Text("Xray (libXray-apple v26.3.27)")
-                    .foregroundStyle(.secondary)
-            }
-            .font(.system(size: 15))
-        }
-        .padding(16)
-        .chumpyCard()
-    }
-
     private func rowLabel(title: LocalizedStringKey, subtitle: LocalizedStringKey) -> some View {
         VStack(alignment: .leading, spacing: 2) {
             Text(subtitle)
@@ -222,6 +201,120 @@ struct SettingsView: View {
             return NSLocalizedString("home.state.disconnecting", bundle: .main, comment: "")
         default: return NSLocalizedString("home.state.down", bundle: .main, comment: "")
         }
+    }
+}
+
+/// The Interface settings page — the settings deck's first leaf, the
+/// one the original client opens the settings on: for now the theme
+/// card alone, the app's whole look answering one pick — the system's
+/// own word, or always light, or always dark.
+struct InterfaceView: View {
+    /// The app's theme word, the ChumpyApp root reads it and hands the
+    /// platform its color scheme: 0 — the system's own, 1 — always
+    /// light, 2 — always dark.
+    @AppStorage("themeMode") private var themeMode: Int = 0
+
+    var body: some View {
+        EdgeScrollView(tag: "interface") {
+            VStack(spacing: 12) {
+                themeCard
+            }
+            .padding(.horizontal, 16)
+            .padding(.top, chumpyContentTopPadding)
+            .padding(.bottom, 104)
+        }
+    }
+
+    // MARK: - Theme
+
+    /// The theme card: three tiles — system, light, dark — the picked
+    /// one wearing the accent, the way the original client's own
+    /// interface page picks its words.
+    private var themeCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            ChartHeader(icon: "paintpalette", title: "settings.theme")
+
+            HStack(spacing: 8) {
+                themeTile(0, icon: "circle.lefthalf.filled", title: "settings.theme.system")
+                themeTile(1, icon: "sun.max.fill", title: "settings.theme.light")
+                themeTile(2, icon: "moon.fill", title: "settings.theme.dark")
+            }
+        }
+        .padding(16)
+        .chumpyCard()
+    }
+
+    /// One theme tile: the icon over the word, the picked one wearing
+    /// the accent's own tint and fill, the rest the quiet surface.
+    private func themeTile(
+        _ mode: Int,
+        icon: String,
+        title: LocalizedStringKey
+    ) -> some View {
+        let isPicked = themeMode == mode
+
+        return Button {
+            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                themeMode = mode
+            }
+        } label: {
+            VStack(spacing: 6) {
+                Image(systemName: icon)
+                    .font(.system(size: 17, weight: .medium))
+                Text(title)
+                    .font(.system(size: 12, weight: .medium))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+            }
+            .foregroundStyle(isPicked ? Chumpy.accent : Color.secondary)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 12)
+            .background(
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .fill(isPicked ? Chumpy.accent.opacity(0.12) : Chumpy.surfaceContainerLow)
+            )
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+/// The About page — the settings deck's last leaf: the app's own word
+/// on itself, the two versions — the app's and the core's — alone on
+/// the card, the page's title in the header already speaking the
+/// "About" the old card's header used to carry.
+struct AboutView: View {
+    var body: some View {
+        EdgeScrollView(tag: "about") {
+            VStack(spacing: 12) {
+                versionsCard
+            }
+            .padding(.horizontal, 16)
+            .padding(.top, chumpyContentTopPadding)
+            .padding(.bottom, 104)
+        }
+    }
+
+    // MARK: - Versions
+
+    private var versionsCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Text("settings.appVersion")
+                Spacer()
+                Text(appVersion)
+                    .foregroundStyle(.secondary)
+            }
+            .font(.system(size: 15))
+            HStack {
+                Text("settings.coreVersion")
+                Spacer()
+                Text("Xray (libXray-apple v26.3.27)")
+                    .foregroundStyle(.secondary)
+            }
+            .font(.system(size: 15))
+        }
+        .padding(16)
+        .chumpyCard()
     }
 
     private var appVersion: String {
