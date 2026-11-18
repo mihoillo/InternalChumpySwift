@@ -76,7 +76,15 @@ jobs:
           ldid -e Payload/Chumpy.app/Chumpy
           echo "--- tunnel entitlements ---"
           ldid -e Payload/Chumpy.app/PlugIns/ChumpyTunnel.appex/ChumpyTunnel
-          zip -qry Chumpy-unsigned.ipa Payload
+          # The zip carries no directory entries on purpose: TrollStore's
+          # install-sheet parser walks every entry under the app bundle
+          # whose name starts with the icon name ("AppIcon") and slices
+          # that prefix off the file name — a directory entry like
+          # "AppIcon.icon/Assets/" leaves a name shorter than the prefix
+          # and the slice dies with NSRangeException, crashing TrollStore
+          # before the install sheet ever shows. Extraction needs no
+          # directory entries: the unarchiver makes the parents itself.
+          zip -qryD Chumpy-unsigned.ipa Payload
           unzip -l Chumpy-unsigned.ipa | head -5
 
       - name: Upload build log on failure
