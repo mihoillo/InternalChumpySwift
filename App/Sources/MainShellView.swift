@@ -410,7 +410,18 @@ struct MainShellView: View {
                 .opacity(settingsNear)
                 .allowsHitTesting(settingsNear >= 0.5)
         }
-        .frame(width: 64 + (Self.pillWidth - 64) * (1 - settingsNear), height: 64)
+        // Leading on purpose: the hidden face inside is the pill's full
+        // 192pt width and it stretches the ZStack to match, so a centered
+        // frame would shove the 64pt visible face half its width past the
+        // leading edge — the gear and the back arrow standing somewhere
+        // left of the pill, untappable, their hit zones lying over the
+        // neighbor pill's slots. Leading pins the wide ZStack's leading
+        // edge to the pill's own, and the 64pt face rides back to center.
+        .frame(
+            width: 64 + (Self.pillWidth - 64) * (1 - settingsNear),
+            height: 64,
+            alignment: .leading
+        )
         .chumpyGlassCapsule()
         .clipShape(Capsule())
         .chumpyPillEdge()
@@ -428,7 +439,11 @@ struct MainShellView: View {
                 .opacity(settingsNear)
                 .allowsHitTesting(settingsNear >= 0.5)
         }
-        .frame(width: 64 + (Self.pillWidth - 64) * settingsNear, height: 64)
+        .frame(
+            width: 64 + (Self.pillWidth - 64) * settingsNear,
+            height: 64,
+            alignment: .leading
+        )
         .chumpyGlassCapsule()
         .clipShape(Capsule())
         .chumpyPillEdge()

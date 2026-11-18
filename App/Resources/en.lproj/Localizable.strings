@@ -67,6 +67,7 @@
 "settings.appIcon" = "App icon";
 "settings.icon.chumpy" = "Chumpy";
 "settings.icon.inverted" = "Inverted";
+"settings.icon.errorTitle" = "Couldn't change the icon";
 "settings.appVersion" = "App version";
 "settings.coreVersion" = "Xray core";
 

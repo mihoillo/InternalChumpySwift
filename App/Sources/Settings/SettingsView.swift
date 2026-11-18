@@ -218,6 +218,19 @@ struct InterfaceView: View {
     /// mirrored here so the picker's ring lands the moment the swap
     /// does. Nil is the icon the app was born with.
     @State private var currentIcon: String?
+    /// The word the platform says when a swap refuses — kept here so
+    /// the failure stops dying in silence: the ring must not move for a
+    /// swap that never happened, and the reason deserves to be read.
+    @State private var iconSwapError: String?
+
+    /// The error alert's own presence — true while a refusal is being
+    /// shown, clearing the word as the alert folds away.
+    private var iconSwapErrorShown: Binding<Bool> {
+        Binding(
+            get: { iconSwapError != nil },
+            set: { if !$0 { iconSwapError = nil } }
+        )
+    }
 
     var body: some View {
         EdgeScrollView(tag: "interface") {
@@ -231,6 +244,12 @@ struct InterfaceView: View {
         }
         .onAppear {
             currentIcon = UIApplication.shared.alternateIconName
+        }
+        .alert(isPresented: iconSwapErrorShown) {
+            Alert(
+                title: Text("settings.icon.errorTitle"),
+                message: Text(iconSwapError ?? "")
+            )
         }
     }
 
@@ -329,7 +348,15 @@ struct InterfaceView: View {
         let radius = 56 * 0.2237
 
         return Button {
-            UIApplication.shared.setAlternateIconName(name) { _ in
+            UIApplication.shared.setAlternateIconName(name) { error in
+                // A refusal keeps the ring where it was and speaks its
+                // reason instead — the old way swallowed the error and
+                // moved the ring anyway, wearing a face the home screen
+                // never put on.
+                if let error {
+                    iconSwapError = error.localizedDescription
+                    return
+                }
                 withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
                     currentIcon = UIApplication.shared.alternateIconName
                 }

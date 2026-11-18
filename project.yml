@@ -36,6 +36,19 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: slop.miho.chumpy.swift
         GENERATE_INFOPLIST_FILE: NO
+        # The alternate home screen icon rides the same rails as the
+        # born one: the AppIconInverted appiconset sits in the catalog
+        # beside AppIcon, and this flag tells actool to include every
+        # icon set it finds — the one named in APPICON_NAME above stays
+        # the primary, the rest become CFBundleAlternateIcons entries,
+        # with actool cutting the loose PNG family and writing the whole
+        # CFBundleIcons dictionary into the Info.plist itself, under the
+        # same canonical naming the primary already wears. The
+        # hand-declared plist keys and the hand-baked suffix family are
+        # gone: iOS resolves CFBundleIconFiles by trying the scale
+        # suffixes alone (name@2x, name@3x), so hand-named files like
+        # name-60@2x never surface and the swap dies quietly.
+        ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS: YES
     info:
       path: App/Info.plist
       properties:
@@ -51,17 +64,6 @@ targets:
           UIApplicationSupportsMultipleScenes: false
         BGTaskSchedulerPermittedIdentifiers:
           - slop.miho.chumpy.swift.subscription-refresh
-        # The alternate home screen icon, the picker's second face: the
-        # classic declaration, one name for the whole suffix family —
-        # iOS finds AppIconInverted-20@2x.png and all its kin by the
-        # base name alone. The primary icon needs no word here: the
-        # appiconset speaks for it.
-        CFBundleIcons:
-          CFBundleAlternateIcons:
-            AppIconInverted:
-              CFBundleIconFiles:
-                - AppIconInverted
-              UIPrerenderedIcon: false
     entitlements:
       path: App/Chumpy.entitlements
       properties:

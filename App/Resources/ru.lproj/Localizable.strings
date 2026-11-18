@@ -67,6 +67,7 @@
 "settings.appIcon" = "Иконка приложения";
 "settings.icon.chumpy" = "Чампи";
 "settings.icon.inverted" = "Инвертированная";
+"settings.icon.errorTitle" = "Не удалось сменить иконку";
 "settings.appVersion" = "Версия приложения";
 "settings.coreVersion" = "Ядро Xray";
 
