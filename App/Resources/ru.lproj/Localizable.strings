@@ -64,6 +64,9 @@
 "settings.theme.system" = "Системная";
 "settings.theme.light" = "Светлая";
 "settings.theme.dark" = "Тёмная";
+"settings.appIcon" = "Иконка приложения";
+"settings.icon.chumpy" = "Чампи";
+"settings.icon.inverted" = "Инвертированная";
 "settings.appVersion" = "Версия приложения";
 "settings.coreVersion" = "Ядро Xray";
 

@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 import ChumpyCore
 
 /// The Connection settings page — the settings deck's middle leaf, the
@@ -213,15 +214,23 @@ struct InterfaceView: View {
     /// platform its color scheme: 0 — the system's own, 1 — always
     /// light, 2 — always dark.
     @AppStorage("themeMode") private var themeMode: Int = 0
+    /// The icon the home screen wears now — the platform's own word,
+    /// mirrored here so the picker's ring lands the moment the swap
+    /// does. Nil is the icon the app was born with.
+    @State private var currentIcon: String?
 
     var body: some View {
         EdgeScrollView(tag: "interface") {
             VStack(spacing: 12) {
                 themeCard
+                iconCard
             }
             .padding(.horizontal, 16)
             .padding(.top, chumpyContentTopPadding)
             .padding(.bottom, 104)
+        }
+        .onAppear {
+            currentIcon = UIApplication.shared.alternateIconName
         }
     }
 
@@ -269,6 +278,82 @@ struct InterfaceView: View {
             .foregroundStyle(isPicked ? Chumpy.accent : Color.secondary)
             .frame(maxWidth: .infinity)
             .padding(.vertical, 12)
+            .background(
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .fill(isPicked ? Chumpy.accent.opacity(0.12) : Chumpy.surfaceContainerLow)
+            )
+        }
+        .buttonStyle(.plain)
+    }
+
+    // MARK: - App icon
+
+    /// The app icon card, the original client's own picker: the two
+    /// faces the app wears on the home screen — Chumpy's blue and the
+    /// inverted one — as previews cut to the home screen's own corner,
+    /// the picked one ringed in the accent. A pick asks the platform to
+    /// swap the icon; the platform answers with its own confirmation
+    /// dialog, the one word iOS never lets an app skip.
+    private var iconCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            ChartHeader(icon: "square.grid.2x2", title: "settings.appIcon")
+
+            HStack(spacing: 12) {
+                iconTile(
+                    name: nil,
+                    preview: "icon-preview-chumpy",
+                    title: "settings.icon.chumpy"
+                )
+                iconTile(
+                    name: "AppIconInverted",
+                    preview: "icon-preview-inverted",
+                    title: "settings.icon.inverted"
+                )
+            }
+        }
+        .padding(16)
+        .chumpyCard()
+    }
+
+    /// One icon tile: the preview cut to the home screen's own corner
+    /// radius — a fifth of the side, the continuous curve the mask
+    /// itself wears — the picked one ringed in the accent, both named
+    /// under. The platform does the swap; nil rides back to the icon
+    /// the app was born with.
+    private func iconTile(
+        name: String?,
+        preview: String,
+        title: LocalizedStringKey
+    ) -> some View {
+        let isPicked = currentIcon == name
+        let radius = 56 * 0.2237
+
+        return Button {
+            UIApplication.shared.setAlternateIconName(name) { _ in
+                withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                    currentIcon = UIApplication.shared.alternateIconName
+                }
+            }
+        } label: {
+            VStack(spacing: 6) {
+                Image(preview)
+                    .resizable()
+                    .frame(width: 56, height: 56)
+                    .clipShape(RoundedRectangle(cornerRadius: radius, style: .continuous))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: radius, style: .continuous)
+                            .strokeBorder(
+                                isPicked ? Chumpy.accent : Color.clear,
+                                lineWidth: 2
+                            )
+                    )
+                    .shadow(color: .black.opacity(0.15), radius: 4, y: 2)
+                Text(title)
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(isPicked ? Chumpy.accent : Color.secondary)
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 10)
             .background(
                 RoundedRectangle(cornerRadius: 14, style: .continuous)
                     .fill(isPicked ? Chumpy.accent.opacity(0.12) : Chumpy.surfaceContainerLow)
