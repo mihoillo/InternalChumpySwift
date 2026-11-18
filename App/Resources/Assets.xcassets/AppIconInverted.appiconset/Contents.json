@@ -1,76 +1,22 @@
 {
   "images": [
     {
-      "size": "20x20",
-      "scale": "2x",
-      "filename": "IconInv@40.png",
-      "idiom": "iphone"
-    },
-    {
-      "size": "20x20",
-      "scale": "3x",
-      "filename": "IconInv@60.png",
-      "idiom": "iphone"
-    },
-    {
-      "size": "29x29",
-      "scale": "2x",
-      "filename": "IconInv@58.png",
-      "idiom": "iphone"
-    },
-    {
-      "size": "29x29",
-      "scale": "3x",
-      "filename": "IconInv@87.png",
-      "idiom": "iphone"
-    },
-    {
-      "size": "40x40",
-      "scale": "2x",
-      "filename": "IconInv@80.png",
-      "idiom": "iphone"
-    },
-    {
-      "size": "40x40",
-      "scale": "3x",
-      "filename": "IconInv@120.png",
-      "idiom": "iphone"
-    },
-    {
-      "size": "60x60",
-      "scale": "2x",
-      "filename": "IconInv@120-1.png",
-      "idiom": "iphone"
-    },
-    {
-      "size": "60x60",
-      "scale": "3x",
-      "filename": "IconInv@180.png",
-      "idiom": "iphone"
-    },
-    {
-      "size": "76x76",
-      "scale": "1x",
-      "filename": "IconInv@76.png",
-      "idiom": "ipad"
-    },
-    {
-      "size": "76x76",
-      "scale": "2x",
-      "filename": "IconInv@152.png",
-      "idiom": "ipad"
-    },
-    {
-      "size": "83.5x83.5",
-      "scale": "2x",
-      "filename": "IconInv@167.png",
-      "idiom": "ipad"
-    },
-    {
-      "size": "1024x1024",
-      "scale": "1x",
       "filename": "AppIconInverted.png",
-      "idiom": "ios-marketing"
+      "idiom": "universal",
+      "platform": "ios",
+      "size": "1024x1024"
+    },
+    {
+      "filename": "AppIconInvertedDark.png",
+      "idiom": "universal",
+      "platform": "ios",
+      "size": "1024x1024",
+      "appearances": [
+        {
+          "appearance": "luminosity",
+          "value": "dark"
+        }
+      ]
     }
   ],
   "info": {

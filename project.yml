@@ -37,21 +37,23 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: slop.miho.chumpy.swift
         GENERATE_INFOPLIST_FILE: NO
         # The alternate home screen icon rides the same rails the born
-        # icon does — the rails Delta and Telegram both ride: the
-        # AppIconInverted appiconset carries every slot the platform
-        # knows (iphone and ipad both), and this flag tells actool to
-        # include it beside the born AppIcon. A full set is the whole
-        # trick: actool copies its faces to the bundle root under the
+        # icon does — and on this toolchain each rail is laid by its
+        # own hand. This flag tells actool to include AppIconInverted
+        # beside the born AppIcon: the set is named in Assets.car and
+        # its CFBundleIconName lands in the plist entry. The set wears
+        # the born icon's own shape — single-size, with its own dark
+        # twin — because iOS 18 resolves an alternate's dark face the
+        # one way it resolves the born icon's: through the catalog, by
+        # appearance-tagged rendition. An alternate without a dark
+        # variant is the shape the last builds shipped, and the phone
+        # answered with the blank grid and a face that never went dark.
+        # The file half of the double rail — the loose faces under the
         # size-infixed names (AppIconInverted60x60@2x.png,
-        # AppIconInverted76x76@2x~ipad.png) and writes the plist entry
-        # with BOTH CFBundleIconFiles and CFBundleIconName — every iOS
-        # and every icon cache resolves it, TrollStore's own parser
-        # included. A single-size set, the first catalog attempt,
-        # births neither the files nor the file names, only a bare
-        # catalog name the iOS 16 icon cache refuses to resolve — the
-        # blank grid the phone wore for two builds straight; and the
-        # loose-file attempt without the catalog wore names the lookup
-        # never tried and died the same death.
+        # AppIconInverted76x76@2x~ipad.png) and the CFBundleIconFiles
+        # strings beside the catalog name — actool refuses to lay on
+        # this toolchain, so CI lays it by hand (see ci.yml): files for
+        # the iOS 16 icon cache that resolves by name, catalog for
+        # every lookup since.
         ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS: YES
     info:
       path: App/Info.plist
