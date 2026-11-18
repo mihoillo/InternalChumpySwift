@@ -36,6 +36,23 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: slop.miho.chumpy.swift
         GENERATE_INFOPLIST_FILE: NO
+        # The alternate home screen icon rides the same rails the born
+        # icon does — the rails Delta and Telegram both ride: the
+        # AppIconInverted appiconset carries every slot the platform
+        # knows (iphone and ipad both), and this flag tells actool to
+        # include it beside the born AppIcon. A full set is the whole
+        # trick: actool copies its faces to the bundle root under the
+        # size-infixed names (AppIconInverted60x60@2x.png,
+        # AppIconInverted76x76@2x~ipad.png) and writes the plist entry
+        # with BOTH CFBundleIconFiles and CFBundleIconName — every iOS
+        # and every icon cache resolves it, TrollStore's own parser
+        # included. A single-size set, the first catalog attempt,
+        # births neither the files nor the file names, only a bare
+        # catalog name the iOS 16 icon cache refuses to resolve — the
+        # blank grid the phone wore for two builds straight; and the
+        # loose-file attempt without the catalog wore names the lookup
+        # never tried and died the same death.
+        ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS: YES
     info:
       path: App/Info.plist
       properties:
@@ -51,23 +68,6 @@ targets:
           UIApplicationSupportsMultipleScenes: false
         BGTaskSchedulerPermittedIdentifiers:
           - slop.miho.chumpy.swift.subscription-refresh
-        # The alternate home screen icon, the picker's second face —
-        # back on the decade-proven file rails: the icon cache resolves
-        # CFBundleIconFiles by trying the scale suffixes alone
-        # (name.png, name@2x.png, name@3x.png), the same rule that
-        # names the born icon AppIcon60x60@2x.png for the string
-        # AppIcon60x60, and the asset catalog's alternate — a bare
-        # CFBundleIconName with no files — renders as a blank grid on
-        # the iOS 16 the phone wears, so the loose PNG family under
-        # those exact names carries the swap instead. The primary icon
-        # needs no word here: the appiconset speaks for it, and its own
-        # new dark appearance with it.
-        CFBundleIcons:
-          CFBundleAlternateIcons:
-            AppIconInverted:
-              CFBundleIconFiles:
-                - AppIconInverted
-              UIPrerenderedIcon: false
     entitlements:
       path: App/Chumpy.entitlements
       properties:
