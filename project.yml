@@ -28,17 +28,6 @@ targets:
     sources:
       - path: App/Sources
       - path: App/Resources
-      # The Icon Composer bundles ride as folder references, the way
-      # Xcode 26 wires them: copied whole into the bundle root, where
-      # iOS 26 reads the layers and pours the Liquid Glass itself —
-      # and every earlier iOS passes them by, never knowing they are
-      # there, the flat PNGs in the appiconset doing the work instead.
-      - path: App/Icons/AppIcon.icon
-        type: folder
-        buildPhase: resources
-      - path: App/Icons/AppIconInverted.icon
-        type: folder
-        buildPhase: resources
     dependencies:
       - package: ChumpyCore
       - package: SwiftyXrayKit
