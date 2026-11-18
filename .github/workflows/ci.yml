@@ -76,6 +76,32 @@ jobs:
           ldid -e Payload/Chumpy.app/Chumpy
           echo "--- tunnel entitlements ---"
           ldid -e Payload/Chumpy.app/PlugIns/ChumpyTunnel.appex/ChumpyTunnel
+          # The alternate icon's file rail: actool writes the catalog
+          # entry (CFBundleIconName) into the plist but stops short of
+          # the file half on this toolchain — it neither copies the
+          # loose faces to the bundle root nor writes the
+          # CFBundleIconFiles strings pointing at them, and the iOS 16
+          # icon cache resolves icons by file names first. The faces
+          # ride in through the resources phase under the exact names
+          # the shipped Delta bundle wears (X@2x 120px, X76x76~ipad
+          # 152px); this step writes the strings, one PlistBuddy call
+          # each, merging with what actool already put there — the
+          # double-rail entry the only TrollStore-proven alternate
+          # bundle carries: catalog name for the new lookups, file
+          # names for every cache since the dawn.
+          PLIST=Payload/Chumpy.app/Info.plist
+          /usr/libexec/PlistBuddy -c "add :CFBundleIcons:CFBundleAlternateIcons:AppIconInverted:CFBundleIconFiles array" "$PLIST"
+          /usr/libexec/PlistBuddy -c "add :CFBundleIcons:CFBundleAlternateIcons:AppIconInverted:CFBundleIconFiles:0 string AppIconInverted60x60" "$PLIST"
+          /usr/libexec/PlistBuddy -c "add :CFBundleIcons:CFBundleAlternateIcons:AppIconInverted:CFBundleIconFiles:1 string AppIconInverted76x76" "$PLIST"
+          /usr/libexec/PlistBuddy -c "add :CFBundleIcons~ipad:CFBundleAlternateIcons:AppIconInverted dict" "$PLIST" 2>/dev/null || true
+          /usr/libexec/PlistBuddy -c "add :CFBundleIcons~ipad:CFBundleAlternateIcons:AppIconInverted:CFBundleIconFiles array" "$PLIST" 2>/dev/null || true
+          /usr/libexec/PlistBuddy -c "add :CFBundleIcons~ipad:CFBundleAlternateIcons:AppIconInverted:CFBundleIconFiles:0 string AppIconInverted76x76" "$PLIST" 2>/dev/null || true
+          /usr/libexec/PlistBuddy -c "add :CFBundleIcons~ipad:CFBundleAlternateIcons:AppIconInverted:CFBundleIconFiles:1 string AppIconInverted60x60" "$PLIST" 2>/dev/null || true
+          /usr/libexec/PlistBuddy -c "add :CFBundleIcons~ipad:CFBundleAlternateIcons:AppIconInverted:CFBundleIconName string AppIconInverted" "$PLIST" 2>/dev/null || true
+          echo "--- alternate icon plist entry ---"
+          /usr/libexec/PlistBuddy -c "print :CFBundleIcons:CFBundleAlternateIcons" "$PLIST"
+          test -f Payload/Chumpy.app/AppIconInverted60x60@2x.png || { echo "no loose alternate @2x"; exit 1; }
+          test -f Payload/Chumpy.app/AppIconInverted76x76@2x~ipad.png || { echo "no loose alternate ipad"; exit 1; }
           # The zip carries no directory entries on purpose: TrollStore's
           # install-sheet parser walks every entry under the app bundle
           # whose name starts with the icon name ("AppIcon") and slices
