@@ -48,6 +48,13 @@ targets:
         # appearance-tagged rendition. An alternate without a dark
         # variant is the shape the last builds shipped, and the phone
         # answered with the blank grid and a face that never went dark.
+        # The dark twin itself is the glyph alone on a fully transparent
+        # face — Apple's rule, verbatim: "Provide your dark app icon
+        # with a transparent background so the system-provided
+        # background can show through." An opaque dark rendition is a
+        # face the phone refuses to wear: the system lays its own
+        # night gradient under the glyph, and wants the glyph's
+        # alpha to know where.
         # The file half of the double rail — the loose faces under the
         # size-infixed names (AppIconInverted60x60@2x.png,
         # AppIconInverted76x76@2x~ipad.png) and the CFBundleIconFiles
