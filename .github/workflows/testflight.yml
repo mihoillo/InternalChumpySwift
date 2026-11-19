@@ -111,6 +111,20 @@ jobs:
             -authenticationKeyIssuerID "$ASC_ISSUER_ID" \
             2>&1 | tee export.log
 
+      # Ground truth for provisioning fights: dumps every profile
+      # xcodebuild fetched, entitlements included, so a mismatch names
+      # its own missing piece.
+      - name: Dump provisioning profiles (debug)
+        if: always()
+        run: |
+          PP="$HOME/Library/Developer/Xcode/UserData/Provisioning Profiles"
+          ls -la "$PP" 2>/dev/null || echo "no profiles dir"
+          for f in "$PP"/*.mobileprovision; do
+            [ -f "$f" ] || continue
+            echo "=== $(basename "$f") ==="
+            security cms -D -i "$f" 2>/dev/null | plutil -p - | grep -E 'AppIDName|Name =|application-groups|networkextension|com.apple.developer|TeamName' || true
+          done
+
       - name: Upload logs on failure
         if: failure()
         uses: actions/upload-artifact@v4
