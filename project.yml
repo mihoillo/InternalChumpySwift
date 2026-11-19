@@ -54,7 +54,10 @@ targets:
         # background can show through." An opaque dark rendition is a
         # face the phone refuses to wear: the system lays its own
         # night gradient under the glyph, and wants the glyph's
-        # alpha to know where.
+        # alpha to know where. Both sets wear the same twin — the
+        # white glyph — so the night face is one face no matter
+        # which icon is picked, the way the phone treats every
+        # other app's dark look.
         # The file half of the double rail — the loose faces under the
         # size-infixed names (AppIconInverted60x60@2x.png,
         # AppIconInverted76x76@2x~ipad.png) and the CFBundleIconFiles
