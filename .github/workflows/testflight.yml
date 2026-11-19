@@ -50,7 +50,7 @@ jobs:
         run: xcodegen generate
 
       - name: Decode App Store Connect API key
-        run: printenv ASC_KEY_P8_BASE64 | base64 -d > AuthKey.p8
+        run: printenv ASC_KEY_P8_BASE64 | base64 -d > "$RUNNER_TEMP/AuthKey.p8"
 
       # Cloud signing covers the no-.p12 case; when the secrets are set
       # the pinned certificate wins. If the archive step below fails
@@ -79,7 +79,7 @@ jobs:
             -archivePath build/Chumpy.xcarchive \
             -skipPackagePluginValidation \
             -allowProvisioningUpdates \
-            -authenticationKeyPath AuthKey.p8 \
+            -authenticationKeyPath "$RUNNER_TEMP/AuthKey.p8" \
             -authenticationKeyID "$ASC_KEY_ID" \
             -authenticationKeyIssuerID "$ASC_ISSUER_ID" \
             CURRENT_PROJECT_VERSION="${{ github.run_number }}" \
@@ -106,7 +106,7 @@ jobs:
             -exportPath build/ipa \
             -exportOptionsPlist ExportOptions.plist \
             -allowProvisioningUpdates \
-            -authenticationKeyPath AuthKey.p8 \
+            -authenticationKeyPath "$RUNNER_TEMP/AuthKey.p8" \
             -authenticationKeyID "$ASC_KEY_ID" \
             -authenticationKeyIssuerID "$ASC_ISSUER_ID" \
             2>&1 | tee export.log
