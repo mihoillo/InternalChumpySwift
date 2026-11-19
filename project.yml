@@ -70,6 +70,9 @@ targets:
           UIApplicationSupportsMultipleScenes: false
         BGTaskSchedulerPermittedIdentifiers:
           - slop.miho.chumpy.swift.subscription-refresh
+        # Xray rides standard TLS only — exempt from export encryption
+        # review. This key keeps the Organizer upload from asking.
+        ITSAppUsesNonExemptEncryption: false
     entitlements:
       path: App/Chumpy.entitlements
       properties:

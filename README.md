@@ -30,7 +30,8 @@ open ChumpySwift.xcodeproj   # scheme Chumpy, iOS-симулятор
 
 Для запуска на устройстве нужны: Development Team + capability
 `App Group (group.slop.miho.chumpy.swift)` и `Network Extension (packet-tunnel-provider)`
-на обоих таргетах. CI пока собирает без подписи (симулятор).
+на обоих таргетах. CI собирает без подписи (симулятор + unsigned IPA для TrollStore);
+подписанный билд в TestFlight льёт отдельный воркфлоу — см. [docs/testflight.md](docs/testflight.md).
 
 ## Дорожная карта
 
