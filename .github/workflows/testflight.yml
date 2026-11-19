@@ -78,11 +78,11 @@ jobs:
             -destination 'generic/platform=iOS' \
             -archivePath build/Chumpy.xcarchive \
             -skipPackagePluginValidation \
-            -currentProjectVersion "${{ github.run_number }}" \
             -allowProvisioningUpdates \
             -authenticationKeyPath AuthKey.p8 \
             -authenticationKeyID "$ASC_KEY_ID" \
             -authenticationKeyIssuerID "$ASC_ISSUER_ID" \
+            CURRENT_PROJECT_VERSION="${{ github.run_number }}" \
             2>&1 | tee archive.log | xcbeautify --renderer github-actions
 
       - name: Export & upload to App Store Connect
