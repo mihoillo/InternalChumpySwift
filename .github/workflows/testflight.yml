@@ -122,7 +122,12 @@ jobs:
           for f in "$PP"/*.mobileprovision; do
             [ -f "$f" ] || continue
             echo "=== $(basename "$f") ==="
-            security cms -D -i "$f" 2>/dev/null | plutil -p - | grep -E 'AppIDName|Name =|application-groups|networkextension|com.apple.developer|TeamName' || true
+            security cms -D -i "$f" > /tmp/prof.plist 2>/dev/null
+            echo "Name:      $(plutil -extract Name raw /tmp/prof.plist)"
+            echo "Created:   $(plutil -extract CreationDate raw /tmp/prof.plist)"
+            echo "Expires:   $(plutil -extract ExpirationDate raw /tmp/prof.plist)"
+            echo "Entitlements:"
+            plutil -extract Entitlements json -o - /tmp/prof.plist
           done
 
       - name: Upload logs on failure
