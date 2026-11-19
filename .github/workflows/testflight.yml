@@ -16,6 +16,11 @@ name: TestFlight
 # for a new TestFlight version line.
 
 on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - 'docs/**'
+      - '**.md'
   workflow_dispatch:
     inputs:
       notes:
