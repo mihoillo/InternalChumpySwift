@@ -26,3 +26,9 @@ Tunnel/ChumpyTunnel.entitlements
 
 # python (ci helper scripts)
 __pycache__/
+
+# ci byproducts written to the repo root
+*.log
+ExportOptions.plist
+cert.p12
+Payload/

@@ -1,7 +1,8 @@
 # InternalChumpySwift
 
 Chumpy for iOS — нативный SwiftUI-порт [Chumpy](https://github.com/ChumpyXray/Chumpy) (Android).
-Внутренние сборки; релизный репозиторий будет отдельным.
+
+**Work in progress — not ready for use.**
 
 ## Структура
 
