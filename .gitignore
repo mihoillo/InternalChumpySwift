@@ -23,3 +23,6 @@ Tunnel/ChumpyTunnel.entitlements
 # misc
 *.ipa
 *.dSYM.zip
+
+# python (ci helper scripts)
+__pycache__/
