@@ -15,6 +15,7 @@ struct ChumpyApp: App {
     /// root hands the resolved accent to the environment, so every
     /// `Color.accentColor` — and every `Chumpy.accent`, its alias —
     /// follows the pick live.
+    @AppStorage("accentHex") private var accentHex: String = ChumpyAccent.defaultHex
     /// The accent kind beside the hex: fixed (including custom), the
     /// theme-following monochrome, or the hidden rainbow behind mono's
     /// long press. Keeping the kind separate preserves the user's fixed
