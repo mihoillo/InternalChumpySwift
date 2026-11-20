@@ -33,7 +33,13 @@ import urllib.request
 import jwt
 
 API = "https://api.appstoreconnect.apple.com/v1"
-MANAGED_NAME = "Xcode Managed Distribution"
+# How the cloud's own minted certificates name themselves: Xcode's
+# older label, and the App Store Connect API's "Created via API" mark
+# the current toolchain stamps on distribution certs CI asks for.
+# Hand-made certificates carry the portal's "Team Name (Team ID)"
+# label instead and never match — they are never revoked here.
+MANAGED_NAMES = {"Xcode Managed Distribution"}
+API_CREATED_MARK = "Created via API"
 DISTRIBUTION_TYPES = {"APPLE_DISTRIBUTION", "IOS_DISTRIBUTION", "DISTRIBUTION"}
 # Keep this many newest managed certificates; everything older goes.
 KEEP = 1
@@ -74,8 +80,11 @@ def main() -> None:
     certificates = api("GET", "/certificates?limit=200")["data"]
     managed = [
         c for c in certificates
-        if c["attributes"].get("name") == MANAGED_NAME
-        and c["attributes"].get("certificateType") in DISTRIBUTION_TYPES
+        if c["attributes"].get("certificateType") in DISTRIBUTION_TYPES
+        and (
+            c["attributes"].get("name") in MANAGED_NAMES
+            or API_CREATED_MARK in c["attributes"].get("name", "")
+        )
     ]
     all_types = {}
     for c in certificates:
