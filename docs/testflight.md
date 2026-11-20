@@ -75,12 +75,16 @@ Actions → **TestFlight** → *Run workflow*. Что делает воркфл�
   сертификат: создай дистрибуционный сертификат и положи его в
   `DIST_CERT_P12_BASE64` (+ пароль).
 - **«Your account has reached the maximum number of certificates»**
-  на archive — у аккаунта лимит дистрибуционных сертификатов, cloud
-  signing не может создать ещё один. Отзови ненужный в
-  *Certificates, Identifiers & Profiles → Certificates* на
-  developer.apple.com (или запини существующий через
-  `DIST_CERT_P12_BASE64` + `DIST_CERT_PASSWORD`) и нажми
-  **Re-run failed jobs** в упавшем запуске — новый пуш не нужен.
+  на archive — раньше означало, что CI наштамповал «Xcode Managed
+  Distribution» до лимита (каждый раннер — чистая VM с пустой связкой
+  ключей, поэтому cloud signing выпускает новый сертификат на каждый
+  запуск). Теперь воркфлоу сам отзывает старые Xcode-managed серты
+  перед архивом (`.github/scripts/prune_distribution_certs.py`,
+  руками созданные не трогает). Если упало и после этого — остаток
+  лимита занят сертификатами, созданными вручную: отзови лишний в
+  *Certificates, Identifiers & Profiles → Certificates* или запини
+  один в `DIST_CERT_P12_BASE64` + `DIST_CERT_PASSWORD` (тогда новые
+  вообще не создаются) и нажми **Re-run failed jobs**.
 - **«No app found with bundle id»** — приложение не создано в ASC
   (шаг 1.3) или bundle ID в `project.yml` не совпадает.
 - **Профиль не собирается на App Group** — зарегистрируй

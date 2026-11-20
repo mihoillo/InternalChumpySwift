@@ -57,6 +57,19 @@ jobs:
       - name: Decode App Store Connect API key
         run: printenv ASC_KEY_P8_BASE64 | base64 -d > "$RUNNER_TEMP/AuthKey.p8"
 
+      # Every runner is a blank VM with an empty keychain, so cloud
+      # signing mints a fresh "Xcode Managed Distribution" certificate
+      # on every run — after a handful of uploads the account hits
+      # Apple's distribution-cert cap and the archive dies. Revoke the
+      # stale managed certificates first (hand-made certs are never
+      # touched), keeping the newest one. See the script for details.
+      - name: Prune stale Xcode-managed distribution certificates
+        run: |
+          python3 -m venv "$RUNNER_TEMP/asc-venv"
+          "$RUNNER_TEMP/asc-venv/bin/pip" install --quiet pyjwt cryptography
+          "$RUNNER_TEMP/asc-venv/bin/python" \
+            .github/scripts/prune_distribution_certs.py "$RUNNER_TEMP/AuthKey.p8"
+
       # Cloud signing covers the no-.p12 case; when the secrets are set
       # the pinned certificate wins. If the archive step below fails
       # with "no signing certificate", this is the rail to lay: create
