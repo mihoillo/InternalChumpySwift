@@ -1,8 +1,11 @@
 name: CI
 
 on:
+  # The unsigned TrollStore IPA is paused for now — main pushes build
+  # TestFlight only (see testflight.yml). CI still guards every other
+  # branch, every PR, and answers a manual dispatch.
   push:
-    branches: ["**"]
+    branches-ignore: [main]
   pull_request:
   workflow_dispatch:
 
