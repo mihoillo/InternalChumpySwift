@@ -443,18 +443,16 @@ struct InterfaceView: View {
     // MARK: - App icon
 
     /// The app icon card, the original client's own picker: the setting's
-    /// header on top, the two faces the app wears on the home screen under
-    /// it, each named beneath its own preview — no tiles under them. A pick
-    /// asks the platform to swap the icon; the platform answers with its
-    /// own confirmation dialog, the one word iOS never lets an app skip.
+    /// header on top, the two faces the app wears on the home screen
+    /// spread across the card's width beneath it, each named under its
+    /// own preview — the Android client's own layout. A pick asks the
+    /// platform to swap the icon; the platform answers with its own
+    /// confirmation dialog, the one word iOS never lets an app skip.
     private var iconCard: some View {
         VStack(alignment: .leading, spacing: 12) {
             ChartHeader(icon: "square.grid.2x2", title: "settings.appIcon")
 
-            // The previews stand adjacent at the trailing edge; the header
-            // above owns the card's full width and may run over their zone.
-            HStack(spacing: 8) {
-                Spacer(minLength: 0)
+            HStack(spacing: 12) {
                 iconPreview(
                     name: nil,
                     preview: "icon-preview-chumpy",
@@ -517,7 +515,7 @@ struct InterfaceView: View {
                     .minimumScaleFactor(0.75)
                     .foregroundStyle(isPicked ? Chumpy.accent : Color.secondary)
             }
-            .frame(width: 96)
+            .frame(maxWidth: .infinity)
             .animation(.spring(response: 0.3, dampingFraction: 0.8), value: isPicked)
             .accessibilityLabel(Text(title))
         }
@@ -526,31 +524,27 @@ struct InterfaceView: View {
 
     // MARK: - Flag style
 
-    /// The flag style's own card: the setting's header, and the one
-    /// toggle the original client's three-way pick narrows to here —
-    /// Twemoji's bundled faces or the platform's own emoji font. No
-    /// globe option rides along; the globe stays the fallback for
-    /// names without a flag.
+    /// The flag style's own card: no separate block header — the
+    /// toggle's own name, the flag glyph beside it, speaks for the
+    /// whole card the way the haptic gate's does. The one toggle
+    /// trades Twemoji's bundled faces against the platform's own
+    /// emoji font; no globe option rides along, the globe stays the
+    /// fallback for names without a flag.
     private var flagStyleCard: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            ChartHeader(icon: "flag.fill", title: "settings.flagStyle")
-
-            Toggle(isOn: Binding(
-                get: { twemojiFlags },
-                set: { enabled in
-                    Haptics.poke()
-                    twemojiFlags = enabled
-                }
-            )) {
-                HStack(spacing: 10) {
-                    FlagView(flag: "🇯🇵", fontSize: 18)
-                        .frame(width: 24)
-                    Text("settings.flagStyle.twemoji")
-                        .font(.system(size: 15))
-                }
+        Toggle(isOn: Binding(
+            get: { twemojiFlags },
+            set: { enabled in
+                Haptics.poke()
+                twemojiFlags = enabled
             }
-            .tint(Chumpy.accent)
+        )) {
+            HStack(spacing: 6) {
+                FlagView(flag: "🇯🇵", fontSize: 14)
+                Text("settings.flagStyle.twemoji")
+                    .font(.system(size: 14, weight: .medium))
+            }
         }
+        .tint(Chumpy.accent)
         .padding(16)
         .chumpyCard()
     }
@@ -558,9 +552,10 @@ struct InterfaceView: View {
     // MARK: - Haptics
 
     /// The haptic gate's own card — the original client's own block,
-    /// right under the interface's other words. The header is the
-    /// toggle's own name, icon and all: the setting speaks for itself,
-    /// no separate block title above it.
+    /// right under the interface's other words. The toggle's own name
+    /// is the card's whole header — the icon beside the title word,
+    /// the hint under it, cut exactly like the headed cards' own
+    /// titles — no separate block header above.
     private var hapticsCard: some View {
         Toggle(isOn: Binding(
             get: { hapticFeedback },
@@ -571,17 +566,17 @@ struct InterfaceView: View {
                 hapticFeedback = enabled
             }
         )) {
-            HStack(spacing: 10) {
-                Image(systemName: "hand.tap")
-                    .font(.system(size: 14, weight: .medium))
-                    .foregroundStyle(Color.accentColor)
-                VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: 2) {
+                HStack(spacing: 6) {
+                    Image(systemName: "hand.tap")
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundStyle(Color.accentColor)
                     Text("settings.haptics")
-                        .font(.system(size: 15))
-                    Text("settings.haptics.hint")
-                        .font(.system(size: 12))
-                        .foregroundStyle(Color.secondary)
+                        .font(.system(size: 14, weight: .medium))
                 }
+                Text("settings.haptics.hint")
+                    .font(.system(size: 12))
+                    .foregroundStyle(Color.secondary)
             }
         }
         .tint(Chumpy.accent)
