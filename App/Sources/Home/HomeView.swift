@@ -43,12 +43,15 @@ struct HomeView: View {
                 ErrorCard(message: error)
             }
             if let profile = appState.store.selectedProfile() {
+                // The flag the panel put at the front of the name rides the
+                // icon slot; the title keeps only the rest — the Android
+                // client's own split, so the preview never says it twice.
+                let raw = profile.remarks.isEmpty ? profile.server : profile.remarks
+                let split = ChumpyFlag.splitLeading(raw)
                 ServerCard(
                     subscription: subscriptionName(for: profile),
-                    title: profile.remarks.isEmpty ? profile.server : profile.remarks,
-                    flag: leadingFlagEmoji(
-                        profile.remarks.isEmpty ? profile.server : profile.remarks
-                    ),
+                    title: split.title.isEmpty ? profile.server : split.title,
+                    flag: split.flag,
                     onClick: onOpenServers
                 )
             }
@@ -235,17 +238,6 @@ struct HomeView: View {
         return sub.name
     }
 
-    /// The flag the panel put at the front of the name rides the icon slot,
-    /// the way the country flags do — anything else keeps the globe.
-    private func leadingFlagEmoji(_ name: String) -> String? {
-        let scalars = Array(name.unicodeScalars.prefix(2))
-        guard scalars.count == 2,
-              (0x1F1E6...0x1F1FF).contains(scalars[0].value),
-              (0x1F1E6...0x1F1FF).contains(scalars[1].value)
-        else { return nil }
-        return "\(scalars[0])\(scalars[1])"
-    }
-
     // MARK: - Live delay
 
     /// While the tunnel stands, the delay is the real thing: a plain
@@ -377,8 +369,7 @@ struct ServerCard: View {
                         .fill(Chumpy.secondaryContainer)
                         .frame(width: 40, height: 40)
                     if let flag {
-                        Text(flag)
-                            .font(.system(size: 22))
+                        FlagView(flag: flag, fontSize: 22)
                     } else {
                         Image(systemName: "globe")
                             .font(.system(size: 20, weight: .regular))

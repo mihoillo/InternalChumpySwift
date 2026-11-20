@@ -72,6 +72,13 @@ targets:
         CFBundleDisplayName: Chumpy
         CFBundleShortVersionString: $(MARKETING_VERSION)
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        # The Twemoji flag face, the Android client's own bundled font
+        # (Mozilla's Twemoji, CC-BY 4.0) — the Interface page's toggle
+        # trades it against the platform's emoji font. Copy Bundle
+        # Resources flattens the file into the bundle root, so the
+        # registration names the bare file.
+        UIAppFonts:
+          - twemoji.ttf
         UILaunchScreen: {}
         UISupportedInterfaceOrientations:
           - UIInterfaceOrientationPortrait

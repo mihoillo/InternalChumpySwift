@@ -9,13 +9,6 @@ import UIKit
 enum Chumpy {
     /// The semantic accent — the root's `.accentColor` pick, live.
     static let accent = Color.accentColor
-    /// The accent's own ink: black over a light accent, white over a
-    /// dark one — the Android client's readable `onPrimary`, kept for
-    /// every plate the accent itself fills.
-    static var onAccent: Color {
-        let hex = UserDefaults.standard.string(forKey: "accentHex") ?? ChumpyAccent.defaultHex
-        return ChumpyAccent.isLight(ChumpyAccent.color(hex: hex)) ? .black : .white
-    }
 
     // MARK: iOS system shades
     // The Android client leans on M3 tonal containers; here the same slots
@@ -42,8 +35,36 @@ enum Chumpy {
 /// The accent's own storage word — the hex string the root reads and
 /// the Interface page's picker writes.
 enum ChumpyAccent {
+    /// The stored accent kind, beside the fixed/custom color's own hex:
+    /// fixed wears that hex, mono follows the theme's ink, rainbow rides
+    /// the original client's twelve-second hue clock.
+    enum Kind: String {
+        case fixed, mono, rainbow
+    }
+
     /// The app's born accent, the Android client's own sky.
     static let defaultHex = "#6FACED"
+
+    /// The accent the root resolves for the whole app. Rainbow advances
+    /// one whole degree at a time — 360 steps over twelve seconds, the
+    /// Android hue clock's own cadence — so the animated color changes
+    /// smoothly enough without recoloring on every animation frame.
+    static func color(
+        kind: String,
+        hex: String,
+        colorScheme: ColorScheme,
+        time: TimeInterval = 0
+    ) -> Color {
+        switch Kind(rawValue: kind) {
+        case .mono:
+            return colorScheme == .dark ? .white : .black
+        case .rainbow:
+            let degrees = (time / 12 * 360).truncatingRemainder(dividingBy: 360)
+            return Color(hue: floor(degrees) / 360, saturation: 0.55, brightness: 0.86)
+        default:
+            return self.color(hex: hex)
+        }
+    }
 
     /// The stored pick as a color; an unreadable string falls back to
     /// the born accent rather than a wrong one.
@@ -58,6 +79,22 @@ enum ChumpyAccent {
         var red: CGFloat = 0, green: CGFloat = 0, blue: CGFloat = 0, alpha: CGFloat = 0
         ui.getRed(&red, green: &green, blue: &blue, alpha: &alpha)
         return 0.299 * red + 0.587 * green + 0.114 * blue > 0.5
+    }
+}
+
+/// The resolved accent's readable ink, provided by the root beside the
+/// tint itself. Unlike the old static hex lookup, this follows mono's
+/// theme flip and rainbow's hue clock through the very same resolution,
+/// so selected rows and filled buttons never wear the previous accent's
+/// foreground.
+private struct ChumpyAccentInkKey: EnvironmentKey {
+    static let defaultValue = Color.white
+}
+
+extension EnvironmentValues {
+    var chumpyAccentInk: Color {
+        get { self[ChumpyAccentInkKey.self] }
+        set { self[ChumpyAccentInkKey.self] = newValue }
     }
 }
 

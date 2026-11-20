@@ -137,3 +137,6 @@
 "settings.accent.indigo" = "Индиго";
 "settings.accent.violet" = "Фиолетовый";
 "settings.accent.custom" = "Свой";
+"settings.accent.mono" = "Монохромный";
+"settings.flagStyle" = "Стиль флага";
+"settings.flagStyle.twemoji" = "Флаги Twemoji";

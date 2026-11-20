@@ -209,9 +209,9 @@ struct SettingsView: View {
 }
 
 /// The Interface settings page — the settings deck's first leaf, the
-/// one the original client opens the settings on: the colors card
-/// (the theme tiles and the accent row), the app icon row, and the
-/// haptic gate.
+/// one the gear's corridor opens on: the colors card (the theme tiles,
+/// the accent row with its hidden rainbow), the app icon row, the flag
+/// style's toggle, and the haptic gate.
 struct InterfaceView: View {
     /// The app's theme word, the ChumpyApp root reads it and hands the
     /// platform its color scheme: 0 — the system's own, 1 — always
@@ -221,6 +221,12 @@ struct InterfaceView: View {
     /// app wears. The picker writes it; the root's environment pick
     /// makes every `Color.accentColor` follow live.
     @AppStorage("accentHex") private var accentHex: String = ChumpyAccent.defaultHex
+    /// Fixed/monochrome/rainbow; the rainbow is mono's long-press secret,
+    /// exactly as the original client hides it.
+    @AppStorage("accentKind") private var accentKind = ChumpyAccent.Kind.fixed.rawValue
+    /// Twemoji's bundled flag faces rather than the platform's emoji font.
+    @AppStorage("twemojiFlags") private var twemojiFlags = true
+    @Environment(\.colorScheme) private var colorScheme
     /// The haptic gate — every poke in the app answers to it.
     @AppStorage("hapticFeedback") private var hapticFeedback: Bool = true
     /// The icon the home screen wears now — the platform's own word,
@@ -249,6 +255,7 @@ struct InterfaceView: View {
             VStack(spacing: 12) {
                 themeCard
                 iconCard
+                flagStyleCard
                 hapticsCard
             }
             .padding(.horizontal, 16)
@@ -265,7 +272,7 @@ struct InterfaceView: View {
             )
         }
         .sheet(isPresented: $showCustomAccent) {
-            CustomAccentSheet(accentHex: $accentHex)
+            CustomAccentSheet(accentHex: $accentHex, accentKind: $accentKind)
         }
     }
 
@@ -332,9 +339,11 @@ struct InterfaceView: View {
 
     /// The accent row, ported from the Android client's `AccentRow`: a
     /// run of round swatches — the seven rainbow hues plus the born sky —
-    /// and the custom one at the end, the paint roller over it. The pick's
-    /// mark is the accent's own ring, a breath off the color; the custom
-    /// swatch opens its own picking sheet.
+    /// then the theme's own monochrome ink, and the custom one at the
+    /// end, the paint roller over it. The pick's mark is the accent's own
+    /// ring, a breath off the color; the custom swatch opens its own
+    /// picking sheet, and a long press on monochrome selects the hidden
+    /// rainbow, which no swatch ever marks.
     private var accentRow: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 4) {
@@ -342,19 +351,41 @@ struct InterfaceView: View {
                     accentSwatch(
                         color: preset.color,
                         label: preset.titleKey,
-                        isSelected: accentHex.caseInsensitiveCompare(preset.hex) == .orderedSame
+                        isSelected: accentKind == ChumpyAccent.Kind.fixed.rawValue
+                            && accentHex.caseInsensitiveCompare(preset.hex) == .orderedSame
                     ) {
                         withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
                             accentHex = preset.hex
+                            accentKind = ChumpyAccent.Kind.fixed.rawValue
                         }
                     }
                 }
+                // Monochrome is the theme's own ink — black in light,
+                // white in dark. The rainbow has no visible swatch: a long
+                // press here selects it, and no swatch wears a ring while it
+                // runs — the Android client's hidden-Accent contract.
+                accentSwatch(
+                    color: colorScheme == .dark ? .white : .black,
+                    label: "settings.accent.mono",
+                    isSelected: accentKind == ChumpyAccent.Kind.mono.rawValue
+                ) {
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                        accentKind = ChumpyAccent.Kind.mono.rawValue
+                    }
+                }
+                .highPriorityGesture(
+                    LongPressGesture(minimumDuration: 0.5).onEnded { _ in
+                        Haptics.poke()
+                        accentKind = ChumpyAccent.Kind.rainbow.rawValue
+                    }
+                )
                 accentSwatch(
                     color: ChumpyAccent.color(hex: accentHex),
                     label: "settings.accent.custom",
-                    isSelected: !AccentPreset.allCases.contains { preset in
-                        accentHex.caseInsensitiveCompare(preset.hex) == .orderedSame
-                    },
+                    isSelected: accentKind == ChumpyAccent.Kind.fixed.rawValue
+                        && !AccentPreset.allCases.contains { preset in
+                            accentHex.caseInsensitiveCompare(preset.hex) == .orderedSame
+                        },
                     marksCustom: true
                 ) {
                     showCustomAccent = true
@@ -420,7 +451,10 @@ struct InterfaceView: View {
         VStack(alignment: .leading, spacing: 12) {
             ChartHeader(icon: "square.grid.2x2", title: "settings.appIcon")
 
+            // The previews stand adjacent at the trailing edge; the header
+            // above owns the card's full width and may run over their zone.
             HStack(spacing: 12) {
+                Spacer(minLength: 0)
                 iconPreview(
                     name: nil,
                     preview: "icon-preview-chumpy",
@@ -479,21 +513,57 @@ struct InterfaceView: View {
                 .frame(width: 64, height: 64)
                 Text(title)
                     .font(.system(size: 12, weight: .medium))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.75)
                     .foregroundStyle(isPicked ? Chumpy.accent : Color.secondary)
             }
-            .frame(maxWidth: .infinity)
+            .frame(width: 96)
             .animation(.spring(response: 0.3, dampingFraction: 0.8), value: isPicked)
             .accessibilityLabel(Text(title))
         }
         .buttonStyle(.plain)
     }
 
+    // MARK: - Flag style
+
+    /// The flag style's own card: the setting's header, and the one
+    /// toggle the original client's three-way pick narrows to here —
+    /// Twemoji's bundled faces or the platform's own emoji font. No
+    /// globe option rides along; the globe stays the fallback for
+    /// names without a flag.
+    private var flagStyleCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            ChartHeader(icon: "flag.fill", title: "settings.flagStyle")
+
+            Toggle(isOn: Binding(
+                get: { twemojiFlags },
+                set: { enabled in
+                    Haptics.poke()
+                    twemojiFlags = enabled
+                }
+            )) {
+                HStack(spacing: 10) {
+                    FlagView(flag: "🇯🇵", fontSize: 18)
+                        .frame(width: 24)
+                    Text("settings.flagStyle.twemoji")
+                        .font(.system(size: 15))
+                }
+            }
+            .tint(Chumpy.accent)
+        }
+        .padding(16)
+        .chumpyCard()
+    }
+
     // MARK: - Haptics
 
     /// The haptic gate's own card — the original client's own block,
-    /// right under the interface's other words.
+    /// right under the interface's other words, wearing the same header
+    /// every other card carries.
     private var hapticsCard: some View {
         VStack(alignment: .leading, spacing: 12) {
+            ChartHeader(icon: "hand.tap", title: "settings.haptics")
+
             Toggle(isOn: Binding(
                 get: { hapticFeedback },
                 set: { enabled in
@@ -503,13 +573,8 @@ struct InterfaceView: View {
                     hapticFeedback = enabled
                 }
             )) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("settings.haptics")
-                        .font(.system(size: 15))
-                    Text("settings.haptics.hint")
-                        .font(.system(size: 12))
-                        .foregroundStyle(Color.secondary)
-                }
+                Text("settings.haptics.hint")
+                    .font(.system(size: 15))
             }
             .tint(Chumpy.accent)
         }
@@ -519,8 +584,8 @@ struct InterfaceView: View {
 }
 
 /// The fixed accents, the Android client's own rainbow hues — the sky
-/// among them, the app's born one. The wallpaper seeds, adaptive and
-/// rainbow have no iOS counterpart and stay home.
+/// among them, the app's born one. Monochrome and the hidden rainbow
+/// live in the picker's own logic, not in this list.
 private enum AccentPreset: String, CaseIterable, Identifiable {
     case red, orange, yellow, green, sky, blue, indigo, violet
 
@@ -564,13 +629,16 @@ private enum AccentPreset: String, CaseIterable, Identifiable {
 /// The pick writes the accent; cancel leaves everything as it was.
 private struct CustomAccentSheet: View {
     @Binding var accentHex: String
+    @Binding var accentKind: String
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.chumpyAccentInk) private var onAccent
 
     @State private var color: Color
     @State private var hexText: String
 
-    init(accentHex: Binding<String>) {
+    init(accentHex: Binding<String>, accentKind: Binding<String>) {
         _accentHex = accentHex
+        _accentKind = accentKind
         let initial = ChumpyAccent.color(hex: accentHex.wrappedValue)
         _color = State(initialValue: initial)
         _hexText = State(initialValue: initial.hexString)
@@ -618,11 +686,12 @@ private struct CustomAccentSheet: View {
                 Button {
                     Haptics.poke()
                     accentHex = color.hexString
+                    accentKind = ChumpyAccent.Kind.fixed.rawValue
                     dismiss()
                 } label: {
                     Text("settings.accent.customPick")
                         .font(.system(size: 15, weight: .semibold))
-                        .foregroundStyle(Chumpy.onAccent)
+                        .foregroundStyle(onAccent)
                         .frame(maxWidth: .infinity)
                         .frame(height: 40)
                         .background(Capsule().fill(Chumpy.accent))
@@ -653,10 +722,10 @@ struct AboutView: View {
                 linksCard
             }
             .padding(.horizontal, 16)
-            // The hero's own sky: the mark stands a mark's height clear of
-            // the top edge, the original client's own About spacing — the
-            // shell hides this page's header title, so no title-sized pad.
-            .padding(.top, chumpyHeaderHeight + 96)
+            // The hero's own sky: the mark stands well clear of the top
+            // edge, the original client's own About spacing — the shell
+            // hides this page's header title, so no title-sized pad.
+            .padding(.top, chumpyHeaderHeight + 128)
             .padding(.bottom, 104)
         }
     }
@@ -690,6 +759,14 @@ struct AboutView: View {
 
     // MARK: - Versions
 
+    /// The card's own hairline between rows — the M3 divider's quiet
+    /// line, inset to the content's own width.
+    private var cardDivider: some View {
+        Rectangle()
+            .fill(Color.primary.opacity(0.08))
+            .frame(height: 0.5)
+    }
+
     private var versionsCard: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
@@ -699,6 +776,7 @@ struct AboutView: View {
                     .foregroundStyle(.secondary)
             }
             .font(.system(size: 15))
+            cardDivider
             HStack {
                 Text("settings.coreVersion")
                 Spacer()
@@ -720,16 +798,17 @@ struct AboutView: View {
     // MARK: - The project's homes
 
     /// The project's two homes, the original client's own link rows:
-    /// the brand's own glyph beside the title and the handle — the
-    /// row goes out, nothing unfolds here.
+    /// the title and the handle on the left, the brand's own glyph at
+    /// the trailing edge — the row goes out, nothing unfolds here.
     private var linksCard: some View {
-        VStack(alignment: .leading, spacing: 16) {
+        VStack(alignment: .leading, spacing: 12) {
             linkRow(
                 title: "settings.about.telegram",
                 handle: "t.me/ChumpyXray",
                 icon: "brand-telegram",
                 url: "https://t.me/ChumpyXray"
             )
+            cardDivider
             linkRow(
                 title: "settings.about.github",
                 handle: "github.com/ChumpyXray/Chumpy",
@@ -747,11 +826,6 @@ struct AboutView: View {
             if let link = URL(string: url) { UIApplication.shared.open(link) }
         } label: {
             HStack(spacing: 12) {
-                Image(icon)
-                    .resizable()
-                    .renderingMode(.template)
-                    .frame(width: 22, height: 22)
-                    .foregroundStyle(Chumpy.accent)
                 VStack(alignment: .leading, spacing: 2) {
                     Text(title)
                         .font(.system(size: 15))
@@ -761,6 +835,11 @@ struct AboutView: View {
                         .foregroundStyle(.secondary)
                 }
                 Spacer(minLength: 0)
+                Image(icon)
+                    .resizable()
+                    .renderingMode(.template)
+                    .frame(width: 22, height: 22)
+                    .foregroundStyle(Chumpy.accent)
             }
             .contentShape(Rectangle())
         }

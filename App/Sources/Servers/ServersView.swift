@@ -9,6 +9,7 @@ import ChumpyCore
 /// by the system's own hairlines; the standing row's light falls softly
 /// onto its neighbors. Pull-to-refresh runs the real-ping sweep.
 struct ServersView: View {
+    @Environment(\.chumpyAccentInk) private var onAccent
     @EnvironmentObject private var appState: AppState
     @StateObject private var model = ServersViewModel()
     @State private var showSubscriptionChooser = false
@@ -318,7 +319,7 @@ struct ServersView: View {
                             }
                         }
                         .font(.system(size: 15, weight: .semibold))
-                        .foregroundStyle(Chumpy.onAccent)
+                        .foregroundStyle(onAccent)
                         .frame(maxWidth: .infinity)
                         .frame(height: 40)
                         .background(Capsule().fill(Chumpy.accent))
@@ -706,6 +707,7 @@ private struct PingStamp: Hashable {
 /// line — the whole row's paint lerps by selection. Ported from the
 /// Android client's `ServerGroupRow` / `ServerRow`.
 private struct ServerGroupRow: View {
+    @Environment(\.chumpyAccentInk) private var onAccent
     let profile: Profile
     let isFirst: Bool
     let isLast: Bool
@@ -750,7 +752,7 @@ private struct ServerGroupRow: View {
                 // Android client wears it — over the group's edge.
                 Image(systemName: "pin.fill")
                     .font(.system(size: 11, weight: .semibold))
-                    .foregroundStyle(isSelected ? Chumpy.onAccent : Color.accentColor)
+                    .foregroundStyle(isSelected ? onAccent : Color.accentColor)
                     .rotationEffect(.degrees(30))
                     .offset(x: 14, y: -11)
                     .padding(.trailing, 10)
@@ -837,7 +839,7 @@ private struct ServerGroupRow: View {
                 HStack(alignment: .firstTextBaseline, spacing: 0) {
                     Text(title)
                         .font(.system(size: 16, weight: .medium))
-                        .foregroundStyle(isSelected ? Chumpy.onAccent : Color.primary)
+                        .foregroundStyle(isSelected ? onAccent : Color.primary)
                         .lineLimit(1)
                         .truncationMode(.middle)
                     // The last real ping, with the sweep's hand-over:
@@ -864,7 +866,7 @@ private struct ServerGroupRow: View {
                 )
                 Text(subtitle)
                     .font(.system(size: 13))
-                    .foregroundStyle(isSelected ? Chumpy.onAccent.opacity(0.78) : Color.secondary)
+                    .foregroundStyle(isSelected ? onAccent.opacity(0.78) : Color.secondary)
                     .lineLimit(1)
                     .truncationMode(.middle)
             }
@@ -874,7 +876,7 @@ private struct ServerGroupRow: View {
             if profile.concealed {
                 Image(systemName: "eye.slash")
                     .font(.system(size: 14))
-                    .foregroundStyle(isSelected ? Chumpy.onAccent : Color.secondary)
+                    .foregroundStyle(isSelected ? onAccent : Color.secondary)
             }
         }
         .padding(16)
@@ -906,41 +908,37 @@ private struct ServerGroupRow: View {
     private var tile: some View {
         ZStack {
             RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .fill(isSelected ? Chumpy.onAccent.opacity(0.16) : Chumpy.secondaryContainer)
+                .fill(isSelected ? onAccent.opacity(0.16) : Chumpy.secondaryContainer)
                 .frame(width: 40, height: 40)
-            if let flag = leadingFlagEmoji {
-                Text(flag)
-                    .font(.system(size: 20))
+            if let flag = leadingFlag {
+                FlagView(flag: flag, fontSize: 20)
             } else if profile.type == .balancer {
                 Image(systemName: "safari")
                     .font(.system(size: 16, weight: .medium))
-                    .foregroundStyle(isSelected ? Chumpy.onAccent : Color.accentColor)
+                    .foregroundStyle(isSelected ? onAccent : Color.accentColor)
             } else {
                 Image(systemName: "globe")
                     .font(.system(size: 16, weight: .regular))
-                    .foregroundStyle(isSelected ? Chumpy.onAccent : Color.accentColor)
+                    .foregroundStyle(isSelected ? onAccent : Color.accentColor)
             }
         }
     }
 
-    private var title: String {
+    /// The name's own split: the leading flag for the tile, the rest for
+    /// the title — the Android client's own law, one shared parser.
+    private var identity: (flag: String?, title: String) {
         let raw = profile.remarks.isEmpty ? profile.server : profile.remarks
-        // The flag the panel put at the front of the name rides the tile
-        // instead; the title keeps the rest.
-        if let flag = leadingFlagEmoji, raw.hasPrefix(flag) {
-            return String(raw.dropFirst(flag.count)).trimmingCharacters(in: .whitespaces)
-        }
-        return raw
+        return ChumpyFlag.splitLeading(raw)
     }
 
-    private var leadingFlagEmoji: String? {
-        let scalars = Array((profile.remarks.isEmpty ? profile.server : profile.remarks)
-            .unicodeScalars.prefix(2))
-        guard scalars.count == 2,
-              (0x1F1E6...0x1F1FF).contains(scalars[0].value),
-              (0x1F1E6...0x1F1FF).contains(scalars[1].value)
-        else { return nil }
-        return "\(scalars[0])\(scalars[1])"
+    private var leadingFlag: String? {
+        identity.flag
+    }
+
+    private var title: String {
+        // A name that was only its flag keeps the address instead of
+        // saying nothing.
+        identity.title.isEmpty ? profile.server : identity.title
     }
 
     /// "· N ms" or the offline tail — only once the row has ever answered a
@@ -964,7 +962,7 @@ private struct ServerGroupRow: View {
     /// ink.
     private var pingColor: Color {
         if isSelected {
-            return Chumpy.onAccent.opacity(0.85)
+            return onAccent.opacity(0.85)
         }
         if let delay = profile.testDelayMillis, delay >= 150 {
             return Color.accentColor
@@ -1071,6 +1069,7 @@ private struct ServerGroupRow: View {
 /// its white check. A long-press asks the delete, the same context
 /// menu the server rows wear; the add row closes the group.
 private struct SubscriptionChooserSheet: View {
+    @Environment(\.chumpyAccentInk) private var onAccent
     @ObservedObject var model: ServersViewModel
     var onAddSubscription: () -> Void
     @Environment(\.dismiss) private var dismiss
@@ -1128,22 +1127,22 @@ private struct SubscriptionChooserSheet: View {
         return HStack(spacing: 16) {
             ZStack {
                 RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .fill(isSelected ? Chumpy.onAccent.opacity(0.16) : Chumpy.secondaryContainer)
+                    .fill(isSelected ? onAccent.opacity(0.16) : Chumpy.secondaryContainer)
                     .frame(width: 40, height: 40)
                 Image(systemName: "externaldrive.fill")
                     .font(.system(size: 17, weight: .medium))
-                    .foregroundStyle(isSelected ? Chumpy.onAccent : Color.accentColor)
+                    .foregroundStyle(isSelected ? onAccent : Color.accentColor)
             }
 
             VStack(alignment: .leading, spacing: 3) {
                 Text(name)
                     .font(.system(size: 16, weight: .medium))
-                    .foregroundStyle(isSelected ? Chumpy.onAccent : Color.primary)
+                    .foregroundStyle(isSelected ? onAccent : Color.primary)
                     .lineLimit(1)
                     .truncationMode(.middle)
                 Text(subtitle)
                     .font(.system(size: 13))
-                    .foregroundStyle(isSelected ? Chumpy.onAccent.opacity(0.78) : Color.secondary)
+                    .foregroundStyle(isSelected ? onAccent.opacity(0.78) : Color.secondary)
                     .lineLimit(1)
                     .truncationMode(.middle)
             }
@@ -1153,7 +1152,7 @@ private struct SubscriptionChooserSheet: View {
             if isSelected {
                 Image(systemName: "checkmark")
                     .font(.system(size: 15, weight: .semibold))
-                    .foregroundStyle(Chumpy.onAccent)
+                    .foregroundStyle(onAccent)
             }
         }
         .padding(16)
