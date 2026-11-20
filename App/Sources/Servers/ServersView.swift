@@ -367,63 +367,95 @@ struct ServersView: View {
 
 // MARK: - Subscription card
 
-/// The subscription card: the database tile on its square backing over the
-/// report — the name, the usage bar, the consumed line, the days left, the
-/// update stamp — with the reload button at its side. Ported from the
-/// Android client's `SubscriptionCard` report face.
+/// The subscription card, the Android client's report face: the square
+/// home-storage tile with the update button underneath on the left, the
+/// report on the right — the name with the last-update stamp in one line,
+/// then one bar for whichever runs dry first (the quota's runway over the
+/// week's own pace, or the calendar's stretch), the days left under it and
+/// the traffic eaten with the share left. The small chevron at the foot
+/// says the card's tap asks which group to show.
 private struct SubscriptionCard: View {
     let subscription: SubscriptionEntity
     @ObservedObject var model: ServersViewModel
 
     var body: some View {
         HStack(alignment: .top, spacing: 16) {
-            ZStack {
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .fill(Chumpy.secondaryContainer)
-                    .frame(width: 40, height: 40)
-                Image(systemName: "externaldrive.fill")
-                    .font(.system(size: 17, weight: .medium))
-                    .foregroundStyle(Color.accentColor)
+            // The tile's own column: the square 48pt database tile with
+            // the update button stacked under it — the original's
+            // 48×36 stadium.
+            VStack(spacing: 8) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        .fill(Chumpy.secondaryContainer)
+                        .frame(width: 48, height: 48)
+                    Image(systemName: "externaldrive.fill")
+                        .font(.system(size: 20, weight: .medium))
+                        .foregroundStyle(Color.accentColor)
+                }
+                updateButton
             }
 
-            VStack(alignment: .leading, spacing: 5) {
-                Text(name)
-                    .font(.system(size: 16, weight: .semibold))
-                    .lineLimit(1)
-                    .truncationMode(.middle)
-                    .foregroundStyle(.primary)
+            VStack(alignment: .leading, spacing: 8) {
+                // The name and the last update's stamp in the same line.
+                HStack(spacing: 8) {
+                    Text(name)
+                        .font(.system(size: 16, weight: .semibold))
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                        .foregroundStyle(.primary)
+                    Spacer(minLength: 0)
+                    if let stamp = updatedStamp {
+                        Text(stamp)
+                            .font(.system(size: 12))
+                            .foregroundStyle(Color.secondary)
+                            .lineLimit(1)
+                    }
+                }
 
-                if subscription.lastError != nil {
-                    Text(subscription.lastError ?? "")
+                if let lastError = subscription.lastError {
+                    Text(lastError)
                         .font(.footnote)
                         .foregroundStyle(Color.red)
                         .lineLimit(2)
                 }
 
-                if subscription.totalBytes > 0 {
-                    usage
-                    consumedLine
-                }
-                if let daysText = expiryText {
-                    Text(daysText)
-                        .font(.system(size: 12))
-                        .foregroundStyle(isExpired ? Color.red : Color.secondary)
-                }
-                if let updated = subscription.lastUpdateSuccess {
-                    Text(String(
-                        format: NSLocalizedString("servers.updatedAt", bundle: .main, comment: ""),
-                        updated.formatted(date: .abbreviated, time: .shortened)
-                    ))
-                    .font(.system(size: 12))
-                    .foregroundStyle(Color.secondary)
+                if hasInfo {
+                    VStack(alignment: .leading, spacing: 8) {
+                        if let bar = usageBar {
+                            usageBarView(bar)
+                        }
+                        // The days' number first, the quota's own report
+                        // under it — the axis the card reads on first.
+                        VStack(alignment: .leading, spacing: 2) {
+                            if let daysText = expiryText {
+                                Text(daysText)
+                                    .font(.system(size: 12))
+                                    .foregroundStyle(Color.secondary)
+                            }
+                            if let trafficLine {
+                                Text(trafficLine)
+                                    .font(.system(size: 12))
+                                    .foregroundStyle(Color.secondary)
+                                    .lineLimit(1)
+                            }
+                        }
+                        // Clear of the chevron at the card's foot.
+                        .padding(.trailing, 12)
+                    }
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-
-            updateButton
         }
         .padding(16)
         .chumpyCard()
+        .overlay(alignment: .bottomTrailing) {
+            Image(systemName: "chevron.down")
+                .font(.system(size: 10, weight: .semibold))
+                .foregroundStyle(.tertiary)
+                .padding(.trailing, 16)
+                .padding(.bottom, 10)
+                .allowsHitTesting(false)
+        }
     }
 
     private var name: String {
@@ -431,78 +463,174 @@ private struct SubscriptionCard: View {
     }
 
     private var updateButton: some View {
-        Group {
-            if model.updatingSubscriptionID == subscription.id {
-                ZStack {
-                    Circle()
-                        .fill(Chumpy.surfaceContainerLow)
-                        .frame(width: 40, height: 40)
-                    ProgressView()
-                        .scaleEffect(0.8)
-                }
-            } else {
-                Button {
-                    Task { await model.updateSubscription(subscription.id) }
-                } label: {
-                    Image(systemName: "arrow.clockwise")
-                        .font(.system(size: 15, weight: .medium))
-                        .foregroundStyle(Color.accentColor)
-                        .frame(width: 40, height: 40)
-                        .background(Circle().fill(Chumpy.surfaceContainerLow))
-                }
-                .buttonStyle(.plain)
-                .disabled(model.isStandaloneSelected)
-                .opacity(model.isStandaloneSelected ? 0.4 : 1)
+        let updating = model.updatingSubscriptionID == subscription.id
+        return Button {
+            Task { await model.updateSubscription(subscription.id) }
+        } label: {
+            ZStack {
+                Capsule()
+                    .fill(Chumpy.secondaryContainer)
+                    .frame(width: 48, height: 36)
+                Image(systemName: "arrow.clockwise")
+                    .font(.system(size: 15, weight: .medium))
+                    .foregroundStyle(Color.accentColor)
+                    .rotationEffect(.degrees(updating ? 360 : 0))
             }
         }
+        .buttonStyle(.plain)
+        .disabled(model.isStandaloneSelected || updating)
+        .opacity(model.isStandaloneSelected ? 0.4 : 1)
+        // The round-trip arrows spin slowly while the fetch runs — the
+        // original's UpdateButton.
+        .animation(
+            updating
+                ? .linear(duration: 1.4).repeatForever(autoreverses: false)
+                : .default,
+            value: updating
+        )
     }
 
-    /// The panel's usage bar: the consumed share of what the panel allows.
-    private var usage: some View {
+    private var usedBytes: Int64 {
+        subscription.uploadBytes + subscription.downloadBytes
+    }
+
+    private var secondsLeft: Int64 {
+        subscription.expireEpochSeconds - Int64(Date().timeIntervalSince1970)
+    }
+
+    private var hasInfo: Bool {
+        subscription.totalBytes > 0 || subscription.expireEpochSeconds > 0 || usedBytes > 0
+    }
+
+    /// The tunnel's average daily burn over the week on record — the days
+    /// the counters actually moved; a still day says nothing about pace.
+    /// Nil until one such day stands in the store: the quota's runway
+    /// can't be projected without it. Ported from the Android client's
+    /// `averageDailyBytes`.
+    private var averageDailyBytes: Double? {
+        let days = model.week.map { $0.rx + $0.tx }.filter { $0 > 0 }
+        guard !days.isEmpty else { return nil }
+        return Double(days.reduce(Int64(0), +)) / Double(days.count)
+    }
+
+    /// The bar's own report — whichever runs dry first, the quota's or
+    /// the calendar's: the quota's runway comes from the week's pace; a
+    /// paceless quota keeps its own drain in the slot (the one reading
+    /// always available), the days' stretch takes it when the panel set
+    /// no quota at all or the quota would outlive the calendar. Ported
+    /// from the Android client's `SubscriptionInfo`.
+    private var usageBar: (progress: Double, color: Color)? {
+        let bytesLeft = max(subscription.totalBytes - usedBytes, 0)
+        let avg = averageDailyBytes
+        let calendarFirst = subscription.expireEpochSeconds > 0 && (
+            subscription.totalBytes <= 0 || (
+                avg != nil && Double(secondsLeft) / 86_400 < Double(bytesLeft) / avg!
+            )
+        )
+        if calendarFirst {
+            let dayFraction = min(max(Double(secondsLeft) / (86_400 * 30), 0), 1)
+            return (
+                secondsLeft <= 0 ? 1 : dayFraction,
+                secondsLeft <= 0 ? Color.red : usageColor(dayFraction)
+            )
+        }
+        guard subscription.totalBytes > 0 else { return nil }
+        let ratio = min(max(Double(bytesLeft) / Double(subscription.totalBytes), 0), 1)
+        return (ratio, usageColor(ratio))
+    }
+
+    /// The traffic-light tiers hiddify reads off the remaining share: red
+    /// under a quarter, amber under half, the accent otherwise.
+    private func usageColor(_ ratio: Double) -> Color {
+        if ratio < 0.25 { return .red }
+        if ratio < 0.45 { return .orange }
+        return Chumpy.accent
+    }
+
+    private func usageBarView(_ bar: (progress: Double, color: Color)) -> some View {
         GeometryReader { geo in
             ZStack(alignment: .leading) {
                 Capsule()
-                    .fill(Chumpy.secondaryContainer)
+                    .fill(Color.secondary.opacity(0.3))
                 Capsule()
-                    .fill(usedRatio > 0.9 ? Color.red : Chumpy.accent)
-                    .frame(width: max(geo.size.width * usedRatio, 4))
+                    .fill(bar.color)
+                    .frame(width: max(geo.size.width * CGFloat(bar.progress), 4))
             }
         }
         .frame(height: 4)
     }
 
-    private var usedRatio: CGFloat {
-        guard subscription.totalBytes > 0 else { return 0 }
-        let used = subscription.uploadBytes + subscription.downloadBytes
-        return min(max(Double(used) / Double(subscription.totalBytes), 0), 1)
-    }
-
-    private var consumedLine: some View {
-        let used = subscription.uploadBytes + subscription.downloadBytes
-        return Text(
-            "\(ByteCountFormatter.string(fromByteCount: used, countStyle: .binary)) / "
-                + ByteCountFormatter.string(fromByteCount: subscription.totalBytes, countStyle: .binary)
-        )
-        .font(.system(size: 12))
-        .foregroundStyle(Color.secondary)
-    }
-
-    private var isExpired: Bool {
-        subscription.expireEpochSeconds > 0
-            && Double(subscription.expireEpochSeconds) < Date().timeIntervalSince1970
-    }
-
+    /// The days-remaining reading both the numbers share — over a year
+    /// reads as never-ending, under a day as hours, the passed calendar
+    /// as expired. Ported from the Android client's `daysTitle`.
     private var expiryText: String? {
         guard subscription.expireEpochSeconds > 0 else { return nil }
-        let secondsLeft = Double(subscription.expireEpochSeconds) - Date().timeIntervalSince1970
-        if secondsLeft <= 0 {
-            return String(localized: "servers.expired", bundle: .main)
+        let daysLeft = secondsLeft / 86_400
+        if daysLeft > 365 {
+            return String(localized: "servers.daysInfinite", bundle: .main)
         }
-        let days = Int(secondsLeft / 86_400)
+        if daysLeft >= 1 {
+            return String(
+                format: NSLocalizedString("servers.daysLeft", bundle: .main, comment: ""),
+                Int(daysLeft)
+            )
+        }
+        if secondsLeft > 0 {
+            return String(
+                format: NSLocalizedString("servers.hoursLeft", bundle: .main, comment: ""),
+                Int(secondsLeft / 3_600)
+            )
+        }
+        return String(localized: "servers.expired", bundle: .main)
+    }
+
+    /// The traffic eaten over the limit: hiddify's "used / total" — and
+    /// when the panel keeps the quota to itself (total=0, the common
+    /// unlimited case) the limit still shows, spelled out. The quota's
+    /// share left appends itself behind a dot when the panel sets one.
+    private var trafficLine: String? {
+        guard usedBytes > 0 || subscription.totalBytes > 0 else { return nil }
+        let total = subscription.totalBytes > 0
+            ? Self.formatBytes(subscription.totalBytes)
+            : String(localized: "servers.unlimited", bundle: .main)
+        let consumed = "\(Self.formatBytes(usedBytes)) / \(total)"
+        guard subscription.totalBytes > 0 else { return consumed }
+        let left = max(subscription.totalBytes - usedBytes, 0)
+        let percent = Int(min(max(Double(left) / Double(subscription.totalBytes), 0), 1) * 100)
+        return "\(consumed) · \(percent)%"
+    }
+
+    /// The last update's stamp for the title line: the time of day if it
+    /// was within the day, the day count in hiddify's shorthand ("2d")
+    /// once it's older. Ported from the Android client's `updatedText`.
+    private var updatedStamp: String? {
+        guard let updated = subscription.lastUpdateSuccess else { return nil }
+        let age = Date().timeIntervalSince(updated)
+        if age < 86_400 {
+            return String(
+                format: NSLocalizedString("servers.updatedAt", bundle: .main, comment: ""),
+                updated.formatted(date: .omitted, time: .shortened)
+            )
+        }
         return String(
-            format: NSLocalizedString("servers.daysLeft", bundle: .main, comment: ""),
-            days
+            format: NSLocalizedString("servers.updatedAgo", bundle: .main, comment: ""),
+            "\(Int(age / 86_400))d"
         )
+    }
+
+    /// Bytes in the panel's own units, down to whole kilobytes — the
+    /// Android client's `formatBytes`.
+    private static func formatBytes(_ bytes: Int64) -> String {
+        if bytes <= 0 { return "0 B" }
+        if bytes < 1024 { return "\(bytes) B" }
+        let units = ["KiB", "MiB", "GiB", "TiB"]
+        var value = Double(bytes)
+        var unit = -1
+        while value >= 1024 && unit < units.count - 1 {
+            value /= 1024
+            unit += 1
+        }
+        return String(format: "%.1f %@", value, units[unit])
     }
 }
 
@@ -765,21 +893,30 @@ private struct ServerGroupRow: View {
         )
     }
 
-    /// 200 ms is where the server starts feeling far away: from there the
-    /// tail takes the accent tone, matching the home ping chip's law.
+    /// 150 ms is where the server starts feeling far away: from there the
+    /// tail takes the accent tone — the original's HIGH_PING_MILLIS.
     /// On the selected plate the tail rides white, like all the row's
     /// ink.
     private var pingColor: Color {
         if isSelected {
             return Color.white.opacity(0.85)
         }
-        if let delay = profile.testDelayMillis, delay >= 200 {
+        if let delay = profile.testDelayMillis, delay >= 150 {
             return Color.accentColor
         }
         return .secondary
     }
 
     private var subtitle: String {
+        // The balancer's own line: how wide it picks, and how — the
+        // original's balancer rows instead of an endpoint they don't own.
+        if profile.type == .balancer {
+            let members = String(
+                format: NSLocalizedString("servers.balancer.members", bundle: .main, comment: ""),
+                profile.balancerMemberKeys.count
+            )
+            return [members, balancerStrategyLabel].joined(separator: "  ·  ")
+        }
         let host = "\(profile.server):\(profile.serverPort)"
         let proto: String?
         switch profile.type {
@@ -787,6 +924,20 @@ private struct ServerGroupRow: View {
         default: proto = profile.type.rawValue.lowercased()
         }
         return [proto, host].compactMap { $0 }.joined(separator: "  ·  ")
+    }
+
+    /// How the core picks the balancer's member of the moment — the
+    /// parser normalizes the strategy name, anything odd falls back to
+    /// random, matching the Android label table.
+    private var balancerStrategyLabel: String {
+        let key: String
+        switch profile.balancerStrategy {
+        case "roundrobin": key = "servers.balancer.roundRobin"
+        case "leastping": key = "servers.balancer.leastPing"
+        case "leastload": key = "servers.balancer.leastLoad"
+        default: key = "servers.balancer.random"
+        }
+        return NSLocalizedString(key, bundle: .main, comment: "")
     }
 
     /// The row's own asks: the pin, the hide, the test — the delete stands
@@ -822,6 +973,15 @@ private struct ServerGroupRow: View {
             Label("servers.row.test", systemImage: "bolt.horizontal")
         }
         if profile.subscriptionID == nil {
+            // The loose configs own themselves: the link they were born
+            // from rides the menu for the copying, dim when there's none —
+            // the Android row menu's own ask.
+            Button {
+                UIPasteboard.general.string = profile.sourceLink
+            } label: {
+                Label("servers.row.copyURL", systemImage: "doc.on.doc")
+            }
+            .disabled(profile.sourceLink == nil)
             Button(role: .destructive) {
                 onDelete()
             } label: {

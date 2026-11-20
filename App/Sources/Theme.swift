@@ -243,12 +243,10 @@ struct InfoChip: View {
                 RoundedRectangle(cornerRadius: 8, style: .continuous)
                     .fill(container)
             )
-            .overlay {
-                if action != nil {
-                    RoundedRectangle(cornerRadius: 8, style: .continuous)
-                        .strokeBorder(Color.primary.opacity(0.05), lineWidth: 0.5)
-                }
-            }
+            // No border, on any chip: the original's only ring is the
+            // focus one (keyboard/controller focus), so a tap alone never
+            // earns an outline — the tappable chips used to wear a
+            // hairline here and stood out from their plain siblings.
             .contentShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
             .modifier(ChipTap(action: action))
     }

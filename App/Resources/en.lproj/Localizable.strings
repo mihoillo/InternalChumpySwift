@@ -107,3 +107,14 @@
 
 "servers.subscriptions" = "Subscriptions";
 "servers.standalone.subtitle" = "%d configs";
+
+"servers.daysInfinite" = "∞ days remaining";
+"servers.hoursLeft" = "%d h left";
+"servers.unlimited" = "unlimited";
+"servers.updatedAgo" = "Updated %@ ago";
+"servers.row.copyURL" = "Copy URL";
+"servers.balancer.members" = "%d servers";
+"servers.balancer.random" = "random";
+"servers.balancer.roundRobin" = "round robin";
+"servers.balancer.leastPing" = "least ping";
+"servers.balancer.leastLoad" = "least load";

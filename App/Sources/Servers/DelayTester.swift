@@ -1,6 +1,9 @@
 import Foundation
+import OSLog
 import ChumpyCore
 import SwiftyXrayKit
+
+private let pingLog = Logger(subsystem: "slop.miho.chumpy.swift", category: "ping")
 
 /// Runs real delay measurements in the app process: a throwaway Xray instance
 /// per profile, started from the ping document, fetching the test URL through
@@ -15,7 +18,10 @@ enum DelayTester {
 
     /// A single measurement, blocking. Nil when the server is unreachable.
     static func measure(profile: Profile, testURL: String) -> Int64? {
-        guard let port = (try? SwiftyXray.getFreePorts(1))?.first else { return nil }
+        guard let port = (try? SwiftyXray.getFreePorts(1))?.first else {
+            pingLog.error("no free port for \(profile.remarks, privacy: .public)")
+            return nil
+        }
         let config = XrayConfigBuilder.buildPing(profile, socksPort: port)
         let path = ChumpyConstant.configsDir
             .appendingPathComponent("ping_\(UUID().uuidString).json")
@@ -44,6 +50,12 @@ enum DelayTester {
                 return raw
             }
         } catch {
+            // Quiet for the row — it wears "can't ping" — but the reason
+            // rides the device log (subsystem above, category "ping"), so
+            // a sweep that fails across the board says why in Console.
+            pingLog.error(
+                "delay \(profile.remarks, privacy: .public) -> nil: \(String(describing: error), privacy: .public)"
+            )
             return nil
         }
     }

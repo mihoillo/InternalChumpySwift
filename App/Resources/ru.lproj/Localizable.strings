@@ -107,3 +107,14 @@
 
 "servers.subscriptions" = "Подписки";
 "servers.standalone.subtitle" = "%d конфигов";
+
+"servers.daysInfinite" = "Бессрочно";
+"servers.hoursLeft" = "Осталось %d ч";
+"servers.unlimited" = "безлимит";
+"servers.updatedAgo" = "Обновлена %@ назад";
+"servers.row.copyURL" = "Скопировать URL";
+"servers.balancer.members" = "%d серверов";
+"servers.balancer.random" = "случайный";
+"servers.balancer.roundRobin" = "по кругу";
+"servers.balancer.leastPing" = "минимальный пинг";
+"servers.balancer.leastLoad" = "минимальная нагрузка";

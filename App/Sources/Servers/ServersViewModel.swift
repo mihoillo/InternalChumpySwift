@@ -22,6 +22,10 @@ final class ServersViewModel: ObservableObject {
     @Published private(set) var concealedCount = 0
     /// The list's own standing order; the header's chip picks it.
     @Published private(set) var sort: ServersSort = .default
+    /// The week's daily traffic totals — the quota runway math's own
+    /// pace source (the subscription card's bar). Ported from the
+    /// Android client's weekly traffic feed.
+    @Published private(set) var week: [DailyTraffic] = []
     @Published var error: String?
 
     /// Whether the concealed rows stand in the list — the reveal mode's
@@ -33,6 +37,7 @@ final class ServersViewModel: ObservableObject {
     var tunnelUp: () -> Bool = { false }
 
     private let store = ProfileStore()
+    private let trafficStore = DailyTrafficStore()
     private lazy var fetcher = SubscriptionFetcher(
         tunnelUp: { [weak self] in self?.tunnelUp() ?? false }
     )
@@ -95,7 +100,17 @@ final class ServersViewModel: ObservableObject {
         profiles = groupRows
             .filter { !$0.hidden && (includeConcealed || !$0.concealed) }
             .sorted { sort.isOrdered($0, before: $1) }
+        week = trafficStore.readWeek()
         error = nil
+
+        // The Android client's `observeProfiles()`: a list that landed
+        // with rows never measured answers with its own sweep over just
+        // them — the "servers ping themselves" behavior. Every answer
+        // marks its row tested, so the sweep never re-arms itself; while
+        // one is already in flight the extra call folds away on the flag.
+        if profiles.contains(where: { $0.type != .balancer && $0.lastTestAt == nil }) {
+            Task { await pingServers(onlyUntested: true) }
+        }
     }
 
     /// The header's sort chip pick: the standing mode trades for the chosen
@@ -267,12 +282,15 @@ final class ServersViewModel: ObservableObject {
 
     /// A real-ping sweep over the current list, one measurement core per
     /// profile, a handful at a time. Pull-to-refresh on the servers screen is
-    /// this; every profile's chip answers with its own number — or clears,
-    /// when the server is unreachable. Ported from the Android client's
-    /// `MainViewModel.startServerSweep`.
-    func pingServers() async {
+    /// this (`onlyUntested = false`); every profile's chip answers with its
+    /// own number — or clears, when the server is unreachable. The automatic
+    /// pass saves `onlyUntested = true` for rows never measured yet.
+    /// Ported from the Android client's `MainViewModel.startServerSweep`.
+    func pingServers(onlyUntested: Bool = false) async {
         if isPinging { return }
-        let targets = profiles.filter { $0.type != .balancer }
+        let targets = profiles.filter {
+            $0.type != .balancer && (!onlyUntested || $0.lastTestAt == nil)
+        }
         guard !targets.isEmpty else { return }
 
         pingGeneration += 1
