@@ -453,7 +453,7 @@ struct InterfaceView: View {
 
             // The previews stand adjacent at the trailing edge; the header
             // above owns the card's full width and may run over their zone.
-            HStack(spacing: 12) {
+            HStack(spacing: 8) {
                 Spacer(minLength: 0)
                 iconPreview(
                     name: nil,
@@ -558,26 +558,33 @@ struct InterfaceView: View {
     // MARK: - Haptics
 
     /// The haptic gate's own card — the original client's own block,
-    /// right under the interface's other words, wearing the same header
-    /// every other card carries.
+    /// right under the interface's other words. The header is the
+    /// toggle's own name, icon and all: the setting speaks for itself,
+    /// no separate block title above it.
     private var hapticsCard: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            ChartHeader(icon: "hand.tap", title: "settings.haptics")
-
-            Toggle(isOn: Binding(
-                get: { hapticFeedback },
-                set: { enabled in
-                    // The poke runs before the gate flips: turning off
-                    // still feels the last poke, turning on stays silent.
-                    Haptics.poke()
-                    hapticFeedback = enabled
-                }
-            )) {
-                Text("settings.haptics.hint")
-                    .font(.system(size: 15))
+        Toggle(isOn: Binding(
+            get: { hapticFeedback },
+            set: { enabled in
+                // The poke runs before the gate flips: turning off
+                // still feels the last poke, turning on stays silent.
+                Haptics.poke()
+                hapticFeedback = enabled
             }
-            .tint(Chumpy.accent)
+        )) {
+            HStack(spacing: 10) {
+                Image(systemName: "hand.tap")
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundStyle(Color.accentColor)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("settings.haptics")
+                        .font(.system(size: 15))
+                    Text("settings.haptics.hint")
+                        .font(.system(size: 12))
+                        .foregroundStyle(Color.secondary)
+                }
+            }
         }
+        .tint(Chumpy.accent)
         .padding(16)
         .chumpyCard()
     }
