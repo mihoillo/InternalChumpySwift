@@ -74,6 +74,13 @@ Actions → **TestFlight** → *Run workflow*. Что делает воркфл�
 - **«No signing certificate»** на archive — cloud signing не создал
   сертификат: создай дистрибуционный сертификат и положи его в
   `DIST_CERT_P12_BASE64` (+ пароль).
+- **«Your account has reached the maximum number of certificates»**
+  на archive — у аккаунта лимит дистрибуционных сертификатов, cloud
+  signing не может создать ещё один. Отзови ненужный в
+  *Certificates, Identifiers & Profiles → Certificates* на
+  developer.apple.com (или запини существующий через
+  `DIST_CERT_P12_BASE64` + `DIST_CERT_PASSWORD`) и нажми
+  **Re-run failed jobs** в упавшем запуске — новый пуш не нужен.
 - **«No app found with bundle id»** — приложение не создано в ASC
   (шаг 1.3) или bundle ID в `project.yml` не совпадает.
 - **Профиль не собирается на App Group** — зарегистрируй

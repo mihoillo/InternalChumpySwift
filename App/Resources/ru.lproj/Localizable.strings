@@ -60,6 +60,7 @@
 "settings.reinstallProfile" = "Удалить VPN-профиль";
 "settings.about" = "О приложении";
 "settings.interface" = "Интерфейс";
+"settings.colors" = "Цвета";
 "settings.theme" = "Тема";
 "settings.theme.system" = "Системная";
 "settings.theme.light" = "Светлая";
@@ -68,8 +69,16 @@
 "settings.icon.chumpy" = "Чампи";
 "settings.icon.inverted" = "Инвертированная";
 "settings.icon.errorTitle" = "Не удалось сменить иконку";
+"settings.accent.customTitle" = "Свой цвет";
+"settings.accent.customHex" = "HEX-цвет";
+"settings.accent.customPick" = "Выбрать";
+"settings.haptics" = "Виброотклик";
+"settings.haptics.hint" = "Лёгкий отклик на нажатия";
 "settings.appVersion" = "Версия приложения";
 "settings.coreVersion" = "Ядро Xray";
+"settings.about.tagline" = "Клиент Xray для iOS";
+"settings.about.telegram" = "Telegram-канал";
+"settings.about.github" = "GitHub";
 
 "routing.global" = "Глобально";
 "routing.ru" = "Обход России";
@@ -118,3 +127,13 @@
 "servers.balancer.roundRobin" = "по кругу";
 "servers.balancer.leastPing" = "минимальный пинг";
 "servers.balancer.leastLoad" = "минимальная нагрузка";
+
+"settings.accent.red" = "Красный";
+"settings.accent.orange" = "Оранжевый";
+"settings.accent.yellow" = "Жёлтый";
+"settings.accent.green" = "Зелёный";
+"settings.accent.sky" = "Голубой";
+"settings.accent.blue" = "Синий";
+"settings.accent.indigo" = "Индиго";
+"settings.accent.violet" = "Фиолетовый";
+"settings.accent.custom" = "Свой";

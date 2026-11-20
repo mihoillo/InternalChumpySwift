@@ -62,6 +62,7 @@ struct ServersView: View {
                         .onTapGesture {
                             // The card's own tap asks which group to show —
                             // the chooser sheet with the thick rows.
+                            Haptics.poke()
                             showSubscriptionChooser = true
                         }
                 }
@@ -137,6 +138,7 @@ struct ServersView: View {
 
     private func sortMenuButton(_ mode: ServersSort) -> some View {
         Button {
+            Haptics.poke()
             model.setSort(mode)
         } label: {
             if mode == model.sort {
@@ -246,7 +248,10 @@ struct ServersView: View {
         ZStack {
             Color.black.opacity(0.25)
                 .ignoresSafeArea()
-                .onTapGesture { closeAddDialog() }
+                .onTapGesture {
+                    Haptics.poke()
+                    closeAddDialog()
+                }
 
             VStack(spacing: 14) {
                 Text("servers.add.subscription")
@@ -273,6 +278,7 @@ struct ServersView: View {
 
                 HStack(spacing: 8) {
                     Button {
+                        Haptics.poke()
                         pasteFromClipboard()
                     } label: {
                         Image(systemName: "doc.on.clipboard")
@@ -287,6 +293,7 @@ struct ServersView: View {
                     .buttonStyle(.plain)
 
                     Button {
+                        Haptics.poke()
                         closeAddDialog()
                     } label: {
                         Text("common.cancel")
@@ -299,6 +306,7 @@ struct ServersView: View {
                     .buttonStyle(.plain)
 
                     Button {
+                        Haptics.poke()
                         submitAdd()
                     } label: {
                         Group {
@@ -310,7 +318,7 @@ struct ServersView: View {
                             }
                         }
                         .font(.system(size: 15, weight: .semibold))
-                        .foregroundStyle(.white)
+                        .foregroundStyle(Chumpy.onAccent)
                         .frame(maxWidth: .infinity)
                         .frame(height: 40)
                         .background(Capsule().fill(Chumpy.accent))
@@ -465,6 +473,7 @@ private struct SubscriptionCard: View {
     private var updateButton: some View {
         let updating = model.updatingSubscriptionID == subscription.id
         return Button {
+            Haptics.poke()
             Task { await model.updateSubscription(subscription.id) }
         } label: {
             ZStack {
@@ -681,9 +690,19 @@ private var rowHairline: some View {
         .allowsHitTesting(false)
 }
 
+/// The ping's own answer as one equatable word — the measured number
+/// and the moment it landed — so a sweep's update animates and pokes
+/// once, not once per field.
+private struct PingStamp: Hashable {
+    let delay: Int64?
+    let at: Date?
+
+    var isMeasured: Bool { delay != nil || at != nil }
+}
+
 /// One row of the grouped list: the 72pt-min body, the round 40pt tile
 /// (tonal, accent when picked) with the flag or the globe, the title with
-/// its "· N ms" tail (accent from 200 ms), the protocol/host supporting
+/// its "· N ms" tail (accent from 150 ms), the protocol/host supporting
 /// line — the whole row's paint lerps by selection. Ported from the
 /// Android client's `ServerGroupRow` / `ServerRow`.
 private struct ServerGroupRow: View {
@@ -704,6 +723,10 @@ private struct ServerGroupRow: View {
     var onToggleConcealed: () -> Void
     var onTest: () -> Void
 
+    /// True once this row has composed its first ping answer — the
+    /// first reading is its own, not a change, so it stays silent.
+    @State private var hasSeenPing = false
+
     var body: some View {
         ZStack(alignment: .topTrailing) {
             rowContent
@@ -720,12 +743,14 @@ private struct ServerGroupRow: View {
                     if !isLast { rowHairline }
                 }
                 .contextMenu { menu }
+                .onAppear { hasSeenPing = pingStamp.isMeasured }
+                .onChange(of: pingStamp) { _ in announcePingChange() }
             if profile.pinned {
                 // The pin at the row's top-right corner, rotated the way the
                 // Android client wears it — over the group's edge.
                 Image(systemName: "pin.fill")
                     .font(.system(size: 11, weight: .semibold))
-                    .foregroundStyle(isSelected ? Color.white : Color.accentColor)
+                    .foregroundStyle(isSelected ? Chumpy.onAccent : Color.accentColor)
                     .rotationEffect(.degrees(30))
                     .offset(x: 14, y: -11)
                     .padding(.trailing, 10)
@@ -788,6 +813,22 @@ private struct ServerGroupRow: View {
         .allowsHitTesting(false)
     }
 
+    /// A sweep's fresh answer taps the soft poke — a dozen rows answer
+    /// in a couple of seconds, and the full tap amplitude would
+    /// machine-gun on a good motor. The row's first composition stays
+    /// quiet: its reading is its own, not a change.
+    private func announcePingChange() {
+        if hasSeenPing { Haptics.softPoke() }
+        hasSeenPing = true
+    }
+
+    /// The ping's whole answer — the number and the moment it was
+    /// measured — as one word, so a sweep's single update speaks once,
+    /// not once per field.
+    private var pingStamp: PingStamp {
+        PingStamp(delay: profile.testDelayMillis, at: profile.lastTestAt)
+    }
+
     private var rowContent: some View {
         HStack(spacing: 16) {
             tile
@@ -796,19 +837,34 @@ private struct ServerGroupRow: View {
                 HStack(alignment: .firstTextBaseline, spacing: 0) {
                     Text(title)
                         .font(.system(size: 16, weight: .medium))
-                        .foregroundStyle(isSelected ? Color.white : Color.primary)
+                        .foregroundStyle(isSelected ? Chumpy.onAccent : Color.primary)
                         .lineLimit(1)
                         .truncationMode(.middle)
+                    // The last real ping, with the sweep's hand-over:
+                    // the old number fades out, the new one flies in
+                    // from the right — the rows trade their numbers one
+                    // by one as the sweep answers each of them.
                     if let pingText {
                         Text("  ·  \(pingText)")
                             .font(.system(size: 13))
                             .lineLimit(1)
                             .foregroundStyle(pingColor)
+                            .id(pingStamp)
+                            .transition(
+                                .asymmetric(
+                                    insertion: .move(edge: .trailing).combined(with: .opacity),
+                                    removal: .opacity
+                                )
+                            )
                     }
                 }
+                .animation(
+                    .spring(response: 0.35, dampingFraction: 0.85),
+                    value: pingStamp
+                )
                 Text(subtitle)
                     .font(.system(size: 13))
-                    .foregroundStyle(isSelected ? Color.white.opacity(0.78) : Color.secondary)
+                    .foregroundStyle(isSelected ? Chumpy.onAccent.opacity(0.78) : Color.secondary)
                     .lineLimit(1)
                     .truncationMode(.middle)
             }
@@ -818,7 +874,7 @@ private struct ServerGroupRow: View {
             if profile.concealed {
                 Image(systemName: "eye.slash")
                     .font(.system(size: 14))
-                    .foregroundStyle(isSelected ? Color.white : Color.secondary)
+                    .foregroundStyle(isSelected ? Chumpy.onAccent : Color.secondary)
             }
         }
         .padding(16)
@@ -826,9 +882,18 @@ private struct ServerGroupRow: View {
         .contentShape(Rectangle())
         .onTapGesture {
             // A concealed row stands where it always stood but stays out
-            // of play: the menu's own "reveal" is its way back.
-            if !profile.concealed { onSelect() }
+            // of play: the menu's own "reveal" is its way back. The
+            // standing row's tap is silence too — the pick already
+            // speaks, the Android client's own law.
+            guard !profile.concealed, !isSelected else { return }
+            Haptics.poke()
+            onSelect()
         }
+        .simultaneousGesture(
+            LongPressGesture(minimumDuration: 0.5).onEnded { _ in
+                Haptics.poke()
+            }
+        )
     }
 
     /// The square 40pt tile with a 12pt corner, concentric with the
@@ -841,7 +906,7 @@ private struct ServerGroupRow: View {
     private var tile: some View {
         ZStack {
             RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .fill(isSelected ? Color.white.opacity(0.16) : Chumpy.secondaryContainer)
+                .fill(isSelected ? Chumpy.onAccent.opacity(0.16) : Chumpy.secondaryContainer)
                 .frame(width: 40, height: 40)
             if let flag = leadingFlagEmoji {
                 Text(flag)
@@ -849,11 +914,11 @@ private struct ServerGroupRow: View {
             } else if profile.type == .balancer {
                 Image(systemName: "safari")
                     .font(.system(size: 16, weight: .medium))
-                    .foregroundStyle(isSelected ? Color.white : Color.accentColor)
+                    .foregroundStyle(isSelected ? Chumpy.onAccent : Color.accentColor)
             } else {
                 Image(systemName: "globe")
                     .font(.system(size: 16, weight: .regular))
-                    .foregroundStyle(isSelected ? Color.white : Color.accentColor)
+                    .foregroundStyle(isSelected ? Chumpy.onAccent : Color.accentColor)
             }
         }
     }
@@ -899,7 +964,7 @@ private struct ServerGroupRow: View {
     /// ink.
     private var pingColor: Color {
         if isSelected {
-            return Color.white.opacity(0.85)
+            return Chumpy.onAccent.opacity(0.85)
         }
         if let delay = profile.testDelayMillis, delay >= 150 {
             return Color.accentColor
@@ -946,6 +1011,7 @@ private struct ServerGroupRow: View {
     @ViewBuilder
     private var menu: some View {
         Button {
+            Haptics.poke()
             onTogglePinned()
         } label: {
             if profile.pinned {
@@ -956,18 +1022,21 @@ private struct ServerGroupRow: View {
         }
         if profile.concealed {
             Button {
+                Haptics.poke()
                 onToggleConcealed()
             } label: {
                 Label("servers.row.reveal", systemImage: "eye")
             }
         } else {
             Button {
+                Haptics.poke()
                 onToggleConcealed()
             } label: {
                 Label("servers.row.hide", systemImage: "eye.slash")
             }
         }
         Button {
+            Haptics.poke()
             onTest()
         } label: {
             Label("servers.row.test", systemImage: "bolt.horizontal")
@@ -977,12 +1046,14 @@ private struct ServerGroupRow: View {
             // from rides the menu for the copying, dim when there's none —
             // the Android row menu's own ask.
             Button {
+                Haptics.poke()
                 UIPasteboard.general.string = profile.sourceLink
             } label: {
                 Label("servers.row.copyURL", systemImage: "doc.on.doc")
             }
             .disabled(profile.sourceLink == nil)
             Button(role: .destructive) {
+                Haptics.poke()
                 onDelete()
             } label: {
                 Label("servers.delete", systemImage: "trash")
@@ -1057,22 +1128,22 @@ private struct SubscriptionChooserSheet: View {
         return HStack(spacing: 16) {
             ZStack {
                 RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .fill(isSelected ? Color.white.opacity(0.16) : Chumpy.secondaryContainer)
+                    .fill(isSelected ? Chumpy.onAccent.opacity(0.16) : Chumpy.secondaryContainer)
                     .frame(width: 40, height: 40)
                 Image(systemName: "externaldrive.fill")
                     .font(.system(size: 17, weight: .medium))
-                    .foregroundStyle(isSelected ? Color.white : Color.accentColor)
+                    .foregroundStyle(isSelected ? Chumpy.onAccent : Color.accentColor)
             }
 
             VStack(alignment: .leading, spacing: 3) {
                 Text(name)
                     .font(.system(size: 16, weight: .medium))
-                    .foregroundStyle(isSelected ? Color.white : Color.primary)
+                    .foregroundStyle(isSelected ? Chumpy.onAccent : Color.primary)
                     .lineLimit(1)
                     .truncationMode(.middle)
                 Text(subtitle)
                     .font(.system(size: 13))
-                    .foregroundStyle(isSelected ? Color.white.opacity(0.78) : Color.secondary)
+                    .foregroundStyle(isSelected ? Chumpy.onAccent.opacity(0.78) : Color.secondary)
                     .lineLimit(1)
                     .truncationMode(.middle)
             }
@@ -1082,7 +1153,7 @@ private struct SubscriptionChooserSheet: View {
             if isSelected {
                 Image(systemName: "checkmark")
                     .font(.system(size: 15, weight: .semibold))
-                    .foregroundStyle(Color.white)
+                    .foregroundStyle(Chumpy.onAccent)
             }
         }
         .padding(16)
@@ -1095,11 +1166,18 @@ private struct SubscriptionChooserSheet: View {
         }
         .contentShape(Rectangle())
         .onTapGesture {
+            Haptics.poke()
             model.selectSubscription(id)
             dismiss()
         }
+        .simultaneousGesture(
+            LongPressGesture(minimumDuration: 0.5).onEnded { _ in
+                Haptics.poke()
+            }
+        )
         .contextMenu {
             Button(role: .destructive) {
+                Haptics.poke()
                 model.deleteSubscription(id)
                 dismiss()
             } label: {
@@ -1135,6 +1213,7 @@ private struct SubscriptionChooserSheet: View {
         )
         .contentShape(Rectangle())
         .onTapGesture {
+            Haptics.poke()
             dismiss()
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.45) {
                 onAddSubscription()

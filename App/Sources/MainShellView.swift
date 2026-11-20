@@ -7,11 +7,16 @@ import SwiftUI
 /// connection, about — and as the deck rides into the settings region
 /// the pills trade faces: the tabs fold into the round back arrow, the
 /// gear unfolds into the categories' capsule, the bar's own width
-/// never changing. The item faces wear the glass indicator gliding
-/// between the equal slots — under the finger with the swipe, on the
-/// shared spring with the settle — and a press held half a beat swells
-/// the glass and lets the finger drag it, the iOS 26 bar's own trick
-/// rebuilt for the plain material years.
+/// never changing. The swipe's corridor is the original's own: the
+/// two groups never mix — a swipe past the last tab finds no next
+/// page, the settings' far wall is the interface leaf, and the only
+/// doors between the groups stay the bar's own pills. The gear always
+/// lands on About, not wherever the settings deck last stood. The item
+/// faces wear the glass indicator gliding between the equal slots —
+/// under the finger with the swipe, on the shared spring with the
+/// settle — and a press held half a beat swells the glass and lets the
+/// finger drag it, the iOS 26 bar's own trick rebuilt for the plain
+/// material years.
 struct MainShellView: View {
     @EnvironmentObject private var appState: AppState
     @State private var page: Page = .home
@@ -229,6 +234,22 @@ struct MainShellView: View {
     /// once its own direction reads horizontal.
     @State private var dragging = false
 
+    /// The current drag's corridor: the group the drag began in, the
+    /// original client's own law — the two groups never mix. Fixed at
+    /// the drag's first word, so a whole swipe either walks the three
+    /// tabs or the three settings leaves, never crosses between them.
+    @State private var corridor: ClosedRange<CGFloat> = 0...2
+
+    /// The swipe corridor a drag anchored at [position] belongs to:
+    /// the settings' three leaves once the anchor stands in their
+    /// region, the three tabs otherwise.
+    private func corridor(at position: CGFloat) -> ClosedRange<CGFloat> {
+        if position >= CGFloat(Page.interface.rawValue) {
+            return CGFloat(Page.interface.rawValue)...CGFloat(Page.about.rawValue)
+        }
+        return 0...CGFloat(Tab.allCases.count - 1)
+    }
+
     /// The horizontal swipe: a clearly horizontal drag is the deck's —
     /// the finger leads, the ends resist, and letting go settles on
     /// the nearest step the throw points at, at most one page from
@@ -244,6 +265,7 @@ struct MainShellView: View {
                     dragging = true
                     dragAnchor = deckPosition.rounded()
                     dragAnchorTravel = -value.translation.width / size.width
+                    corridor = corridor(at: dragAnchor)
                     startWatchdog()
                 }
                 lastDragEvent = .now
@@ -251,11 +273,11 @@ struct MainShellView: View {
                 // the deck, not the position, so the travel is the
                 // translation's mirror, past the anchor's own.
                 let traveled = -value.translation.width / size.width - dragAnchorTravel
-                let available = CGFloat(Page.about.rawValue)
                 let raw = dragAnchor + traveled
-                // The ends resist: past the first or the last page the
-                // deck yields less and less, and always springs back.
-                let bounded = min(max(raw, 0), available)
+                // The corridor's ends resist: past the group's first or
+                // last page the deck yields less and less, and always
+                // springs back — the other group has no swipe door.
+                let bounded = min(max(raw, corridor.lowerBound), corridor.upperBound)
                 let overshoot = raw - bounded
                 deckPosition = bounded + overshoot * 0.32
             }
@@ -266,19 +288,22 @@ struct MainShellView: View {
                 let traveled = -value.translation.width / size.width - dragAnchorTravel
                 let thrown = -value.velocity.width / size.width * 0.25
                 let raw = dragAnchor + traveled + thrown
-                let available = CGFloat(Page.about.rawValue)
                 // One page per swipe: the throw may point past the next
                 // page, but the deck settles at most one step from where
-                // the drag began — one forward or one back, never a leap.
+                // the drag began — one forward or one back, never a leap,
+                // and never out of the corridor.
                 let stepped = min(max(raw.rounded(), dragAnchor - 1), dragAnchor + 1)
-                let target = min(max(stepped, 0), available)
+                let target = min(max(stepped, corridor.lowerBound), corridor.upperBound)
                 settleDeck(to: Page(rawValue: Int(target)) ?? page)
             }
     }
 
     /// Sends the deck to a page on the bar's own ride: along the same
-    /// horizontal spine, page over page, on the shared spring.
+    /// horizontal spine, page over page, on the shared spring. Every
+    /// ask that rides it — a tab, the gear, the back arrow, a held
+    /// press's release — pokes like every other button.
     private func rideDeck(to target: Page) {
+        Haptics.poke()
         settleDeck(to: target)
     }
 
@@ -321,10 +346,10 @@ struct MainShellView: View {
         }
     }
 
-    /// The page the deck sits closest to — the watchdog's landing spot.
+    /// The page the deck sits closest to — the watchdog's landing spot,
+    /// inside the drag's own corridor.
     private func nearestPage() -> Page {
-        let available = CGFloat(Page.about.rawValue)
-        let target = min(max(deckPosition.rounded(), 0), available)
+        let target = min(max(deckPosition.rounded(), corridor.lowerBound), corridor.upperBound)
         return Page(rawValue: Int(target)) ?? page
     }
 
@@ -361,8 +386,14 @@ struct MainShellView: View {
 
     /// How far the deck has ridden into the settings region: 0 at the
     /// last tab, 1 at the interface page. Both pills' faces ride it.
+    /// A drag is its own law: the swipe's corridor never crosses the
+    /// groups' wall, so the faces never trade mid-drag — the rubber
+    /// band at the corridor's end is the deck's alone, not the pills'.
     private var settingsNear: CGFloat {
-        min(max(deckPosition - CGFloat(Tab.allCases.count - 1), 0), 1)
+        if dragging {
+            return corridor.lowerBound > 0 ? 1 : 0
+        }
+        return min(max(deckPosition - CGFloat(Tab.allCases.count - 1), 0), 1)
     }
 
     /// One item slot's own width — equal slots, the glass's travel step.
@@ -463,7 +494,9 @@ struct MainShellView: View {
     }
 
     /// The gear face — the settings door at rest, the deck's ride into
-    /// the settings region starting here.
+    /// the settings region starting here. Like the original client's
+    /// gear, it always lands on About, not wherever the settings deck
+    /// last stood.
     private var gearFace: some View {
         Image(systemName: "gearshape.fill")
             .font(.system(size: 20, weight: .medium))
@@ -476,7 +509,7 @@ struct MainShellView: View {
             .frame(width: 64, height: 64)
             .contentShape(Rectangle())
             .onTapGesture {
-                rideDeck(to: .interface)
+                rideDeck(to: .about)
             }
     }
 

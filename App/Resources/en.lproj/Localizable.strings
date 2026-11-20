@@ -60,6 +60,7 @@
 "settings.reinstallProfile" = "Remove VPN profile";
 "settings.about" = "About";
 "settings.interface" = "Interface";
+"settings.colors" = "Colors";
 "settings.theme" = "Theme";
 "settings.theme.system" = "System";
 "settings.theme.light" = "Light";
@@ -68,8 +69,16 @@
 "settings.icon.chumpy" = "Chumpy";
 "settings.icon.inverted" = "Inverted";
 "settings.icon.errorTitle" = "Couldn't change the icon";
+"settings.accent.customTitle" = "Custom color";
+"settings.accent.customHex" = "Hex color";
+"settings.accent.customPick" = "Pick";
+"settings.haptics" = "Haptic feedback";
+"settings.haptics.hint" = "A light poke when the buttons are tapped";
 "settings.appVersion" = "App version";
 "settings.coreVersion" = "Xray core";
+"settings.about.tagline" = "An Xray client for iOS";
+"settings.about.telegram" = "Telegram channel";
+"settings.about.github" = "GitHub";
 
 "routing.global" = "Global";
 "routing.ru" = "Bypass Russia";
@@ -118,3 +127,13 @@
 "servers.balancer.roundRobin" = "round robin";
 "servers.balancer.leastPing" = "least ping";
 "servers.balancer.leastLoad" = "least load";
+
+"settings.accent.red" = "Red";
+"settings.accent.orange" = "Orange";
+"settings.accent.yellow" = "Yellow";
+"settings.accent.green" = "Green";
+"settings.accent.sky" = "Sky";
+"settings.accent.blue" = "Blue";
+"settings.accent.indigo" = "Indigo";
+"settings.accent.violet" = "Violet";
+"settings.accent.custom" = "Custom";

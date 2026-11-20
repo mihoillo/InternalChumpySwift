@@ -2,11 +2,20 @@ import SwiftUI
 import UIKit
 
 // MARK: - Accent color
-// The actual tint color lives in Assets.xcassets (AccentColor).
-// `Chumpy.accent` makes it easy to reference in code.
+// The accent is the app's own pick, stored as a hex string the root
+// reads and hands the environment. `Chumpy.accent` is the semantic
+// accent color, so every view that reads it follows the pick live.
 
 enum Chumpy {
-    static let accent = Color("AccentColor")
+    /// The semantic accent — the root's `.accentColor` pick, live.
+    static let accent = Color.accentColor
+    /// The accent's own ink: black over a light accent, white over a
+    /// dark one — the Android client's readable `onPrimary`, kept for
+    /// every plate the accent itself fills.
+    static var onAccent: Color {
+        let hex = UserDefaults.standard.string(forKey: "accentHex") ?? ChumpyAccent.defaultHex
+        return ChumpyAccent.isLight(ChumpyAccent.color(hex: hex)) ? .black : .white
+    }
 
     // MARK: iOS system shades
     // The Android client leans on M3 tonal containers; here the same slots
@@ -28,6 +37,57 @@ enum Chumpy {
     static let cardRadius: CGFloat = 28
     /// The inner group corner — M3 `extraSmall`, 4dp.
     static let innerRadius: CGFloat = 4
+}
+
+/// The accent's own storage word — the hex string the root reads and
+/// the Interface page's picker writes.
+enum ChumpyAccent {
+    /// The app's born accent, the Android client's own sky.
+    static let defaultHex = "#6FACED"
+
+    /// The stored pick as a color; an unreadable string falls back to
+    /// the born accent rather than a wrong one.
+    static func color(hex: String) -> Color {
+        Color(hex: hex) ?? Color(hex: defaultHex)!
+    }
+
+    /// Whether the color reads as light — the word that decides the
+    /// ink over the accent: black on light colors, white on dark ones.
+    static func isLight(_ color: Color) -> Bool {
+        let ui = UIColor(color)
+        var red: CGFloat = 0, green: CGFloat = 0, blue: CGFloat = 0, alpha: CGFloat = 0
+        ui.getRed(&red, green: &green, blue: &blue, alpha: &alpha)
+        return 0.299 * red + 0.587 * green + 0.114 * blue > 0.5
+    }
+}
+
+extension Color {
+    /// A color from a `#RRGGBB` or `RRGGBB` string; nil when the string
+    /// isn't one.
+    init?(hex: String) {
+        var text = hex.trimmingCharacters(in: .whitespacesAndNewlines)
+        if text.hasPrefix("#") { text.removeFirst() }
+        guard text.count == 6,
+              let value = UInt64(text, radix: 16)
+        else { return nil }
+        self.init(
+            red: Double((value >> 16) & 0xFF) / 255,
+            green: Double((value >> 8) & 0xFF) / 255,
+            blue: Double(value & 0xFF) / 255
+        )
+    }
+
+    /// The color as `#RRGGBB` — the custom accent's own word back into
+    /// the store.
+    var hexString: String {
+        let ui = UIColor(self)
+        var red: CGFloat = 0, green: CGFloat = 0, blue: CGFloat = 0, alpha: CGFloat = 0
+        ui.getRed(&red, green: &green, blue: &blue, alpha: &alpha)
+        func channel(_ value: CGFloat) -> String {
+            String(format: "%02X", Int(round(value * 255)))
+        }
+        return "#\(channel(red))\(channel(green))\(channel(blue))"
+    }
 }
 
 // MARK: - Chumpy card
@@ -290,7 +350,10 @@ private struct ChipTap: ViewModifier {
 
     func body(content: Content) -> some View {
         if let action {
-            Button(action: action) { content }
+            Button(action: {
+                Haptics.poke()
+                action()
+            }) { content }
                 .buttonStyle(.plain)
         } else {
             content

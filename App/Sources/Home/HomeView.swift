@@ -16,6 +16,8 @@ struct HomeView: View {
     @State private var liveDelayTask: Task<Void, Never>?
     /// The ping chip's own re-measure: "…" until the new value lands.
     @State private var measuringPing = false
+    /// True while the current error has already spoken its kicks.
+    @State private var errorAnnounced = false
 
     private let ticker = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
 
@@ -61,8 +63,29 @@ struct HomeView: View {
         // 16 lands the button 16pt off the bar).
         .padding(.bottom, 92)
         .onReceive(ticker) { now = $0 }
-        .onAppear { startLiveDelayIfUp() }
-        .onChange(of: appState.status) { _ in startLiveDelayIfUp() }
+        .onAppear {
+            startLiveDelayIfUp()
+            errorAnnounced = appState.lastError != nil
+        }
+        .onChange(of: appState.status) { oldStatus in
+            // The connect result talks through the skin: a double poke
+            // when the tunnel comes up, three grumpy kicks when it fails.
+            if oldStatus == .connecting,
+               appState.status == .connected || appState.status == .reasserting {
+                Haptics.successPokes()
+            }
+            startLiveDelayIfUp()
+        }
+        .onChange(of: appState.lastError) { error in
+            if error != nil {
+                if !errorAnnounced {
+                    errorAnnounced = true
+                    Haptics.failureKicks()
+                }
+            } else {
+                errorAnnounced = false
+            }
+        }
         .onDisappear {
             liveDelayTask?.cancel()
             liveDelayTask = nil
@@ -277,13 +300,14 @@ struct HomeView: View {
     /// never crowd the capsule's rounded ends.
     private var connectButton: some View {
         Button {
+            Haptics.poke()
             Task { await appState.toggle() }
         } label: {
             WavyConnectBar(
                 fill: connectFill,
                 draining: appState.status == .disconnecting,
-                color: isUp ? Color.white : Chumpy.accent,
-                trackColor: (isUp ? Color.white : Chumpy.accent).opacity(0.30)
+                color: isUp ? Chumpy.onAccent : Chumpy.accent,
+                trackColor: (isUp ? Chumpy.onAccent : Chumpy.accent).opacity(0.30)
             )
             .padding(.horizontal, 28)
             .frame(height: 20)
