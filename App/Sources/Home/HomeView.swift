@@ -306,8 +306,11 @@ struct HomeView: View {
             WavyConnectBar(
                 fill: connectFill,
                 draining: appState.status == .disconnecting,
-                color: isUp ? Chumpy.onAccent : Chumpy.accent,
-                trackColor: (isUp ? Chumpy.onAccent : Chumpy.accent).opacity(0.30)
+                // The wave is never black on the accent: white reads clean
+                // on the loud fill in both themes, the accent itself rides
+                // the calm tonal container when idle.
+                color: isUp ? .white : Chumpy.accent,
+                trackColor: (isUp ? .white : Chumpy.accent).opacity(0.30)
             )
             .padding(.horizontal, 28)
             .frame(height: 20)
@@ -472,7 +475,6 @@ struct WavyConnectBar: View {
     }
 
     private func draw(in size: CGSize, fill: CGFloat, phase: CGFloat, context: GraphicsContext) {
-        let width = size.width
         let centerY = size.height / 2
         let stroke: CGFloat = 6
         let amplitude: CGFloat = 5
@@ -480,6 +482,14 @@ struct WavyConnectBar: View {
         let gap: CGFloat = 4
         let phasePx = phase * wavelength
         let inset = stroke / 2
+        // The round cap reaches stroke/2 beyond the path's own end. Give the
+        // wave its own side margins: the canvas paints inside its bounds, so
+        // a path ending at 0 or the edge gets its cap sliced flat — exactly
+        // the cut ends a full-width wave used to show. Everything draws in
+        // the inset content strip; the outer canvas keeps the margin.
+        let width = size.width - stroke
+        var striped = context
+        striped.translateBy(x: inset, y: 0)
         let wavyStroke = StrokeStyle(lineWidth: stroke, lineCap: .round)
 
         func wavePath(from x0: CGFloat, to x1: CGFloat, amplitude amp: CGFloat) -> Path {
@@ -501,14 +511,14 @@ struct WavyConnectBar: View {
         func flatTrack(from x0: CGFloat, to x1: CGFloat) {
             guard x1 - x0 > inset else { return }
             var path = Path()
-            path.move(to: CGPoint(x: max(x0, inset), y: centerY))
-            path.addLine(to: CGPoint(x: min(x1, width - inset), y: centerY))
-            context.stroke(path, with: .color(trackColor), style: wavyStroke)
+            path.move(to: CGPoint(x: max(x0, 0), y: centerY))
+            path.addLine(to: CGPoint(x: min(x1, width), y: centerY))
+            striped.stroke(path, with: .color(trackColor), style: wavyStroke)
         }
 
         if fill >= 0.999 {
             // All wave, all the way across.
-            context.stroke(
+            striped.stroke(
                 wavePath(from: 0, to: width, amplitude: amplitude),
                 with: .color(color),
                 style: wavyStroke
@@ -520,7 +530,7 @@ struct WavyConnectBar: View {
             // The wave retreats to the right and exits at the right edge.
             let left = width * (1 - fill)
             flatTrack(from: 0, to: left - gap)
-            context.stroke(
+            striped.stroke(
                 wavePath(from: left, to: width, amplitude: amplitude),
                 with: .color(color),
                 style: wavyStroke
@@ -529,7 +539,7 @@ struct WavyConnectBar: View {
             // Filling up from the left, the track behind it.
             let right = width * fill
             flatTrack(from: right + gap, to: width)
-            context.stroke(
+            striped.stroke(
                 wavePath(from: 0, to: right, amplitude: amplitude),
                 with: .color(color),
                 style: wavyStroke

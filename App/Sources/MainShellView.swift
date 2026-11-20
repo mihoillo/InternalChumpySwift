@@ -146,21 +146,25 @@ struct MainShellView: View {
             // the status bar and the home indicator alike; the plain
             // frame sizes each band, the background carries it into the
             // unsafe zones, and the outer frame pins it to its own edge.
-            // Home never scrolls and holds its ground clear.
+            // Home never scrolls and holds its ground clear; About wears
+            // the original client's bare hero instead of a page title — no
+            // header title strip there, the page's own mark speaks for it.
             if page != .home {
-                Color.clear
-                    .frame(height: chumpyHeaderHeight)
-                    .overlay(
-                        MorphingPageTitle(
-                            titleKey: pageTitleKey,
-                            fold: topStrength,
-                            scrolled: scrolled
+                if page != .about {
+                    Color.clear
+                        .frame(height: chumpyHeaderHeight)
+                        .overlay(
+                            MorphingPageTitle(
+                                titleKey: pageTitleKey,
+                                fold: topStrength,
+                                scrolled: scrolled
+                            )
                         )
-                    )
-                    .background(EdgeBlur(edge: .top, strength: topStrength).ignoresSafeArea(edges: .top))
-                    .allowsHitTesting(false)
-                    .frame(maxHeight: .infinity, alignment: .top)
-                    .transition(.opacity)
+                        .background(EdgeBlur(edge: .top, strength: topStrength).ignoresSafeArea(edges: .top))
+                        .allowsHitTesting(false)
+                        .frame(maxHeight: .infinity, alignment: .top)
+                        .transition(.opacity)
+                }
 
                 Color.clear
                     .frame(height: bottomBlurHeight)

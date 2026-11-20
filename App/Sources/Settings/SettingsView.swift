@@ -288,6 +288,10 @@ struct InterfaceView: View {
         }
         .padding(16)
         .chumpyCard()
+        // The accent row bleeds to the card's own edges; the card's shape
+        // owns the clip, so a half-scrolled swatch ends at the rounded
+        // corner, not at a square seam inside it.
+        .clipShape(ChumpyCardShape())
     }
 
     /// One theme tile: the icon over the word, the picked one wearing
@@ -356,8 +360,14 @@ struct InterfaceView: View {
                     showCustomAccent = true
                 }
             }
+            // The card's own 16pt insets ride as content padding: the row
+            // itself spans the card edge to edge, so swatches run under the
+            // card's rounded ends and only there get clipped — the half
+            // swatch at the edge shows the row continues.
+            .padding(.horizontal, 16)
             .padding(.vertical, 6)
         }
+        .padding(.horizontal, -16)
     }
 
     /// One swatch: the 48pt color in a 60pt wrapper, the pick's ring a
@@ -401,30 +411,25 @@ struct InterfaceView: View {
 
     // MARK: - App icon
 
-    /// The app icon card, the original client's own row: the setting's
-    /// name over the picked variant's on the left, the two faces the app
-    /// wears on the home screen beside each other on the right — no
-    /// tiles under them, the previews alone. A pick asks the platform
-    /// to swap the icon; the platform answers with its own confirmation
-    /// dialog, the one word iOS never lets an app skip.
+    /// The app icon card, the original client's own picker: the setting's
+    /// header on top, the two faces the app wears on the home screen under
+    /// it, each named beneath its own preview — no tiles under them. A pick
+    /// asks the platform to swap the icon; the platform answers with its
+    /// own confirmation dialog, the one word iOS never lets an app skip.
     private var iconCard: some View {
-        HStack(spacing: 16) {
-            VStack(alignment: .leading, spacing: 2) {
-                Text("settings.appIcon")
-                    .font(.system(size: 15))
-                Text(selectedIconTitle)
-                    .font(.system(size: 13))
-                    .foregroundStyle(Color.secondary)
-            }
-            Spacer(minLength: 0)
+        VStack(alignment: .leading, spacing: 12) {
+            ChartHeader(icon: "square.grid.2x2", title: "settings.appIcon")
+
             HStack(spacing: 12) {
                 iconPreview(
                     name: nil,
-                    preview: "icon-preview-chumpy"
+                    preview: "icon-preview-chumpy",
+                    title: "settings.icon.chumpy"
                 )
                 iconPreview(
                     name: "AppIconInverted",
-                    preview: "icon-preview-inverted"
+                    preview: "icon-preview-inverted",
+                    title: "settings.icon.inverted"
                 )
             }
         }
@@ -432,22 +437,14 @@ struct InterfaceView: View {
         .chumpyCard()
     }
 
-    /// The picked variant's own name, under the setting's.
-    private var selectedIconTitle: LocalizedStringKey {
-        currentIcon == nil ? "settings.icon.chumpy" : "settings.icon.inverted"
-    }
-
     /// One icon preview: the face cut to the home screen's own corner
     /// radius — a fifth of the side, the continuous curve the mask
-    /// itself wears — the picked one ringed in the accent, a breath off
-    /// the icon. The platform does the swap; nil rides back to the icon
-    /// the app was born with.
-    private func iconPreview(name: String?, preview: String) -> some View {
+    /// itself wears — the picked one ringed in the accent, its name
+    /// spoken underneath. The platform does the swap; nil rides back to
+    /// the icon the app was born with.
+    private func iconPreview(name: String?, preview: String, title: LocalizedStringKey) -> some View {
         let isPicked = currentIcon == name
         let radius = 56 * 0.2237
-        let title: LocalizedStringKey = name == nil
-            ? "settings.icon.chumpy"
-            : "settings.icon.inverted"
 
         return Button {
             Haptics.poke()
@@ -465,20 +462,26 @@ struct InterfaceView: View {
                 }
             }
         } label: {
-            ZStack {
-                Image(preview)
-                    .resizable()
-                    .frame(width: 56, height: 56)
-                    .clipShape(RoundedRectangle(cornerRadius: radius, style: .continuous))
-                    .scaleEffect(isPicked ? 0.9 : 1)
-                    .shadow(color: .black.opacity(0.15), radius: 4, y: 2)
-                if isPicked {
-                    RoundedRectangle(cornerRadius: radius + 3, style: .continuous)
-                        .stroke(Chumpy.accent, lineWidth: 2)
-                        .frame(width: 62, height: 62)
+            VStack(spacing: 8) {
+                ZStack {
+                    Image(preview)
+                        .resizable()
+                        .frame(width: 56, height: 56)
+                        .clipShape(RoundedRectangle(cornerRadius: radius, style: .continuous))
+                        .scaleEffect(isPicked ? 0.9 : 1)
+                        .shadow(color: .black.opacity(0.15), radius: 4, y: 2)
+                    if isPicked {
+                        RoundedRectangle(cornerRadius: radius + 3, style: .continuous)
+                            .stroke(Chumpy.accent, lineWidth: 2)
+                            .frame(width: 62, height: 62)
+                    }
                 }
+                .frame(width: 64, height: 64)
+                Text(title)
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(isPicked ? Chumpy.accent : Color.secondary)
             }
-            .frame(width: 64, height: 64)
+            .frame(maxWidth: .infinity)
             .animation(.spring(response: 0.3, dampingFraction: 0.8), value: isPicked)
             .accessibilityLabel(Text(title))
         }
@@ -650,7 +653,10 @@ struct AboutView: View {
                 linksCard
             }
             .padding(.horizontal, 16)
-            .padding(.top, chumpyContentTopPadding)
+            // The hero's own sky: the mark stands a mark's height clear of
+            // the top edge, the original client's own About spacing — the
+            // shell hides this page's header title, so no title-sized pad.
+            .padding(.top, chumpyHeaderHeight + 96)
             .padding(.bottom, 104)
         }
     }
@@ -665,6 +671,7 @@ struct AboutView: View {
                 .resizable()
                 .frame(width: 96, height: 96)
                 .clipShape(RoundedRectangle(cornerRadius: 96 * 0.2237, style: .continuous))
+                .shadow(color: .black.opacity(0.15), radius: 8, y: 4)
                 .padding(.bottom, 12)
             Text("Chumpy")
                 .font(.system(size: 34, weight: .bold))
